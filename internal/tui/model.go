@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/Decapix/dl-organisation/internal/cli"
@@ -30,6 +31,7 @@ type mode int
 
 const (
 	modeList mode = iota
+	modeFilter
 	modeHelp
 )
 
@@ -43,6 +45,10 @@ type Model struct {
 
 	mode   mode
 	status string // the last action's output or error, shown in the footer
+
+	// filter is the query typed after `/`. It stays applied when the user
+	// returns to the list, so you can filter and then act on what is left.
+	filter textinput.Model
 
 	width, height int
 
@@ -59,7 +65,10 @@ type Model struct {
 // New builds a browser over a session. Call Run rather than using this
 // directly, except in tests.
 func New(s Session) Model {
-	return Model{session: s}
+	in := textinput.New()
+	in.Prompt = "/"
+	in.Placeholder = "name, path or note"
+	return Model{session: s, filter: in}
 }
 
 // slotExists reports whether a slot is still valid, through the seam when
@@ -98,10 +107,9 @@ func (m Model) selected() *slots.Slot {
 	return &m.view[m.cursor]
 }
 
-// applyFilter recomputes view from slots. Filtering arrives in the next task;
-// for now every slot is admitted.
+// applyFilter recomputes view from slots and the current query.
 func (m *Model) applyFilter() {
-	m.view = m.slots
+	m.view = filterSlots(m.slots, m.filter.Value())
 	m.clampCursor()
 }
 
@@ -144,6 +152,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.mode = modeList // any key closes the overlay
 		return m, nil
 	}
+	if m.mode == modeFilter {
+		return m.handleFilterKey(msg)
+	}
 	return m.handleListKey(msg)
 }
 
@@ -170,6 +181,11 @@ func (m Model) handleListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.clampCursor()
 		return m, nil
 
+	case "/":
+		m.mode = modeFilter
+		m.filter.Focus()
+		return m, textinput.Blink
+
 	case "?":
 		m.mode = modeHelp
 		return m, nil
@@ -178,6 +194,29 @@ func (m Model) handleListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.jump()
 	}
 	return m, nil
+}
+
+// handleFilterKey feeds the query input and refilters on every keystroke, so
+// the list narrows as you type.
+func (m Model) handleFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "enter":
+		// Keep the query; the user filtered in order to act on what is left.
+		m.mode = modeList
+		m.filter.Blur()
+		return m, nil
+	case "esc", "ctrl+c":
+		m.mode = modeList
+		m.filter.Blur()
+		m.filter.SetValue("")
+		m.applyFilter()
+		return m, nil
+	}
+
+	var cmd tea.Cmd
+	m.filter, cmd = m.filter.Update(msg)
+	m.applyFilter()
+	return m, cmd
 }
 
 // jump runs --cd on the selected slot and quits. On failure it stays open and
