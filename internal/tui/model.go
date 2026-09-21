@@ -6,6 +6,7 @@
 package tui
 
 import (
+	"fmt"
 	"io"
 	"strconv"
 	"strings"
@@ -33,6 +34,8 @@ type mode int
 const (
 	modeList mode = iota
 	modeFilter
+	modeRename
+	modeConfirm
 	modeHelp
 )
 
@@ -94,6 +97,15 @@ type Model struct {
 	// than the screen can be scrolled rather than truncated.
 	note viewport.Model
 
+	// rename is the inline input shown by `n`.
+	rename textinput.Model
+
+	// confirmPrompt is the question shown in modeConfirm, and confirmCmd is
+	// what answering yes would run. A single keystroke destroying something
+	// deserves a question; a typed command line does not.
+	confirmPrompt string
+	confirmCmd    cli.Command
+
 	width, height int
 
 	// finalOutput is printed to stdout after the program exits, so the note
@@ -112,7 +124,12 @@ func New(s Session) Model {
 	in := textinput.New()
 	in.Prompt = "/"
 	in.Placeholder = "name, path or note"
-	return Model{session: s, filter: in}
+
+	ren := textinput.New()
+	ren.Prompt = "name: "
+	ren.CharLimit = 40
+
+	return Model{session: s, filter: in, rename: ren}
 }
 
 // slotExists reports whether a slot is still valid, through the seam when
@@ -212,8 +229,13 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.mode = modeList // any key closes the overlay
 		return m, nil
 	}
-	if m.mode == modeFilter {
+	switch m.mode {
+	case modeFilter:
 		return m.handleFilterKey(msg)
+	case modeRename:
+		return m.handleRenameKey(msg)
+	case modeConfirm:
+		return m.handleConfirmKey(msg)
 	}
 	return m.handleListKey(msg)
 }
@@ -252,6 +274,41 @@ func (m Model) handleListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.note.HalfViewUp()
 		return m, nil
 
+	case "a":
+		// No ref: --set picks the lowest free slot.
+		return m.run(cli.Command{Action: cli.ActionSet})
+
+	case "d":
+		sl := m.selected()
+		if sl == nil {
+			return m, nil
+		}
+		m.mode = modeConfirm
+		m.confirmPrompt = fmt.Sprintf("delete slot %d (%s)? [y/N]", sl.Number, sl.DisplayName())
+		m.confirmCmd = cli.Command{Action: cli.ActionDelete, Ref: strconv.Itoa(sl.Number)}
+		return m, nil
+
+	case "r":
+		sl := m.selected()
+		if sl == nil {
+			return m, nil
+		}
+		m.mode = modeConfirm
+		m.confirmPrompt = fmt.Sprintf("clear slot %d's name and note? [y/N]", sl.Number)
+		m.confirmCmd = cli.Command{Action: cli.ActionReset, Ref: strconv.Itoa(sl.Number)}
+		return m, nil
+
+	case "n":
+		sl := m.selected()
+		if sl == nil {
+			return m, nil
+		}
+		m.mode = modeRename
+		m.rename.SetValue(sl.Name)
+		m.rename.CursorEnd()
+		m.rename.Focus()
+		return m, textinput.Blink
+
 	case "/":
 		m.mode = modeFilter
 		m.filter.Focus()
@@ -265,6 +322,65 @@ func (m Model) handleListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.jump()
 	}
 	return m, nil
+}
+
+// run executes a command, records what it said, and schedules a reload so the
+// list reflects the change.
+func (m Model) run(cmd cli.Command) (tea.Model, tea.Cmd) {
+	var out strings.Builder
+	if err := m.session.Run(cmd, &out); err != nil {
+		m.status = err.Error()
+		return m, nil
+	}
+	m.status = strings.TrimSpace(firstLine(out.String()))
+	return m, m.reload()
+}
+
+// firstLine is the part of an action's output that fits in a status bar.
+func firstLine(s string) string {
+	if i := strings.IndexByte(s, '\n'); i >= 0 {
+		return s[:i]
+	}
+	return s
+}
+
+// handleConfirmKey takes the y/N answer. Anything but y cancels, so a
+// mistyped key is always the safe outcome.
+func (m Model) handleConfirmKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	m.mode = modeList
+	pending := m.confirmCmd
+	m.confirmPrompt = ""
+	m.confirmCmd = cli.Command{}
+	if msg.String() != "y" && msg.String() != "Y" {
+		m.status = "cancelled"
+		return m, nil
+	}
+	return m.run(pending)
+}
+
+// handleRenameKey takes the new name.
+func (m Model) handleRenameKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc", "ctrl+c":
+		m.mode = modeList
+		m.rename.Blur()
+		return m, nil
+	case "enter":
+		sl := m.selected()
+		m.mode = modeList
+		m.rename.Blur()
+		if sl == nil {
+			return m, nil
+		}
+		return m.run(cli.Command{
+			Action: cli.ActionRename,
+			Ref:    strconv.Itoa(sl.Number),
+			Name:   m.rename.Value(),
+		})
+	}
+	var cmd tea.Cmd
+	m.rename, cmd = m.rename.Update(msg)
+	return m, cmd
 }
 
 // handleFilterKey feeds the query input and refilters on every keystroke, so
