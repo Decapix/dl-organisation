@@ -124,3 +124,35 @@ func TestFilteringRewindsTheWindow(t *testing.T) {
 		t.Errorf("the only match is not rendered:\n%s", m.View())
 	}
 }
+
+// The height budget must be right on its own, not rescued by the clamp. If
+// the body renders one row too many the clamp drops the first slot, and the
+// top of your list silently disappears.
+func TestTheBodyFitsWithoutClamping(t *testing.T) {
+	f := &fakeSession{slots: manySlots(5)}
+	for _, size := range []struct{ w, h int }{{92, 16}, {100, 24}, {80, 12}, {120, 30}} {
+		m := New(f)
+		m.exists = func(string) bool { return true }
+		m.slots = f.slots
+		m.applyFilter()
+		updated, _ := m.Update(tea.WindowSizeMsg{Width: size.w, Height: size.h})
+		mm := updated.(Model)
+		// A note long enough to fill the pane, so wrapping would show.
+		mm.note.SetContent(strings.Repeat("x", size.w))
+
+		body := len(strings.Split(mm.renderBody(), "\n"))
+		if want := bodyRows(size.h); body != want {
+			t.Errorf("at %dx%d the body is %d rows, want %d", size.w, size.h, body, want)
+		}
+	}
+}
+
+// The first slot must be on screen when the whole list fits; losing it was
+// the symptom of the body overflowing by one row.
+func TestTheFirstRowIsVisibleWhenTheListFits(t *testing.T) {
+	f := &fakeSession{slots: manySlots(5)}
+	got := sized(f, 92, 16)
+	if !strings.Contains(got, "slot01") {
+		t.Errorf("the first slot is missing although the list fits:\n%s", got)
+	}
+}

@@ -49,8 +49,8 @@ func TestSlashFiltersTheList(t *testing.T) {
 	}
 
 	m = typeString(m, "gam")
-	if len(m.view) != 1 || m.view[0].Number != 12 {
-		t.Fatalf("view = %+v, want only slot 12", m.view)
+	if len(m.view) != 1 || m.view[0].from != 3 {
+		t.Fatalf("view = %+v, want only slot 3", m.view)
 	}
 }
 
@@ -60,7 +60,7 @@ func TestFilterSearchesNotes(t *testing.T) {
 	m := newTestModel(&fakeSession{slots: threeSlots()})
 	next, _ := m.Update(key('/'))
 	m = typeString(next.(Model), "second")
-	if len(m.view) != 1 || m.view[0].Number != 1 {
+	if len(m.view) != 1 || m.view[0].from != 1 {
 		t.Fatalf("view = %+v, want only slot 1 (matched in its note)", m.view)
 	}
 }

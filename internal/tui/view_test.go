@@ -21,7 +21,7 @@ func sized(f *fakeSession, w, h int) string {
 
 func TestViewShowsEverySlot(t *testing.T) {
 	got := sized(&fakeSession{slots: threeSlots()}, 100, 24)
-	for _, want := range []string{"alpha", "beta", "gamma", "1", "7", "12"} {
+	for _, want := range []string{"alpha", "beta", "gamma", "1", "2", "3"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("view does not contain %q:\n%s", want, got)
 		}

@@ -58,12 +58,32 @@ func listPaneWidth(total int) int {
 	return total - 2
 }
 
-// notePaneWidth is how wide the note pane gets at a given terminal width.
+// notePaneWidth is the whole width of the note block, border and padding
+// included.
 func notePaneWidth(total int) int {
 	w := total - 2
 	if total >= wideMin {
 		w = total - listPaneWidth(total) - 3 // gap, border and padding
 	}
+	if w < 1 {
+		return 1
+	}
+	return w
+}
+
+// noteChrome is the columns notePaneWidth spends on the left border and the
+// padding beside it.
+const noteChrome = 2
+
+// noteContentWidth is how wide the viewport inside the note block may be.
+// Setting the viewport to notePaneWidth instead would overflow the block by
+// exactly these two columns, wrapping every full-width line and pushing the
+// body one row taller than the layout budgeted for.
+func noteContentWidth(total int) int {
+	if total < wideMin {
+		return notePaneWidth(total) // stacked: no border, no padding
+	}
+	w := notePaneWidth(total) - noteChrome
 	if w < 1 {
 		return 1
 	}
@@ -115,7 +135,7 @@ type Model struct {
 	session Session
 
 	slots  []slots.Slot // everything the store holds
-	view   []slots.Slot // what the current filter admits
+	view   []row        // the lines on screen: slots, and the holes between them
 	cursor int          // index into view
 
 	// top is the first row of view that is on screen. The list is windowed
@@ -197,17 +217,43 @@ func (m Model) reload() tea.Cmd {
 	}
 }
 
-// selected is the slot under the cursor, or nil when the list is empty.
-func (m Model) selected() *slots.Slot {
+// selectedRow is the line under the cursor. Its zero value is a row covering
+// no slot number, which every caller treats as "nothing here".
+func (m Model) selectedRow() row {
 	if m.cursor < 0 || m.cursor >= len(m.view) {
-		return nil
+		return row{}
 	}
-	return &m.view[m.cursor]
+	return m.view[m.cursor]
 }
 
-// applyFilter recomputes view from slots and the current query.
+// selected is the slot under the cursor, or nil when the cursor is on an
+// empty row or the list is empty. Returning nil for an empty row is what
+// makes every slot key a no-op there without each one having to check.
+func (m Model) selected() *slots.Slot {
+	return m.selectedRow().slot
+}
+
+// slotCount is how many real slots the view holds, which is what the header
+// reports: an empty row is not a slot.
+func (m Model) slotCount() int {
+	n := 0
+	for _, r := range m.view {
+		if r.slot != nil {
+			n++
+		}
+	}
+	return n
+}
+
+// applyFilter recomputes view from slots and the current query. With no query
+// the holes in the numbering are shown; with one they are not, because
+// filtering is for finding something and an empty slot is not something.
 func (m *Model) applyFilter() {
-	m.view = filterSlots(m.slots, m.filter.Value())
+	if q := m.filter.Value(); q != "" {
+		m.view = slotRows(filterSlots(m.slots, q))
+	} else {
+		m.view = buildRows(m.slots)
+	}
 	m.clampCursor()
 	m.scrollToCursor()
 	m.syncNote()
@@ -216,11 +262,16 @@ func (m *Model) applyFilter() {
 // syncNote points the note pane at the selected slot and rewinds it to the
 // top, so moving to another slot never lands you halfway down its note.
 func (m *Model) syncNote() {
-	sl := m.selected()
-	if sl == nil {
+	r := m.selectedRow()
+	switch {
+	case r.slot != nil:
+		m.note.SetContent(r.slot.Note)
+	case r.collapsed():
+		m.note.SetContent(fmt.Sprintf("slots %d to %d are empty", r.from, r.to))
+	case r.from > 0:
+		m.note.SetContent(fmt.Sprintf("slot %d is empty\n\npress a to save the current directory here", r.from))
+	default:
 		m.note.SetContent("")
-	} else {
-		m.note.SetContent(sl.Note)
 	}
 	m.note.GotoTop()
 }
@@ -263,7 +314,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
-		m.note.Width = notePaneWidth(msg.Width)
+		m.note.Width = noteContentWidth(msg.Width)
 		m.note.Height = notePaneHeight(msg.Width, msg.Height)
 		m.scrollToCursor()
 		m.syncNote()
@@ -353,12 +404,18 @@ func (m Model) handleListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case "a":
-		// No ref: --set picks the lowest free slot.
+		// On a single empty row, save into that slot: showing a free number
+		// is only half the value, filling it is the other half. Anywhere
+		// else --set picks the lowest free slot.
+		if r := m.selectedRow(); r.empty() && !r.collapsed() && r.from > 0 {
+			return m.run(cli.Command{Action: cli.ActionSet, Ref: strconv.Itoa(r.from)})
+		}
 		return m.run(cli.Command{Action: cli.ActionSet})
 
 	case "d":
 		sl := m.selected()
 		if sl == nil {
+			m.status = m.emptyRowMessage("delete")
 			return m, nil
 		}
 		m.mode = modeConfirm
@@ -369,6 +426,7 @@ func (m Model) handleListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "r":
 		sl := m.selected()
 		if sl == nil {
+			m.status = m.emptyRowMessage("clear")
 			return m, nil
 		}
 		m.mode = modeConfirm
@@ -379,6 +437,7 @@ func (m Model) handleListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "e":
 		sl := m.selected()
 		if sl == nil {
+			m.status = m.emptyRowMessage("edit")
 			return m, nil
 		}
 		return m, tea.Exec(
@@ -389,6 +448,7 @@ func (m Model) handleListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "n":
 		sl := m.selected()
 		if sl == nil {
+			m.status = m.emptyRowMessage("rename")
 			return m, nil
 		}
 		m.mode = modeRename
@@ -494,11 +554,25 @@ func (m Model) handleFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+// emptyRowMessage explains why a slot key did nothing.
+func (m Model) emptyRowMessage(verb string) string {
+	r := m.selectedRow()
+	switch {
+	case r.collapsed():
+		return fmt.Sprintf("slots %d to %d are empty — nothing to %s", r.from, r.to, verb)
+	case r.from > 0:
+		return fmt.Sprintf("slot %d is empty — nothing to %s", r.from, verb)
+	default:
+		return ""
+	}
+}
+
 // jump runs --cd on the selected slot and quits. On failure it stays open and
 // reports why, because an error the user can act on is worth a screen.
 func (m Model) jump() (tea.Model, tea.Cmd) {
 	sl := m.selected()
 	if sl == nil {
+		m.status = m.emptyRowMessage("jump to")
 		return m, nil
 	}
 	var out strings.Builder

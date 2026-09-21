@@ -105,7 +105,7 @@ func TestQuitDoesNotJump(t *testing.T) {
 func TestEnterJumpsAndQuits(t *testing.T) {
 	f := &fakeSession{slots: threeSlots()}
 	m := newTestModel(f)
-	next, _ := m.Update(key('j')) // select slot 7
+	next, _ := m.Update(key('j')) // select slot 2
 	m = next.(Model)
 
 	_, cmd := m.Update(special(tea.KeyEnter))
@@ -116,8 +116,8 @@ func TestEnterJumpsAndQuits(t *testing.T) {
 	if got.Action != cli.ActionCD {
 		t.Fatalf("action = %v, want ActionCD", got.Action)
 	}
-	if got.Ref != "7" {
-		t.Fatalf("ref = %q, want %q", got.Ref, "7")
+	if got.Ref != "2" {
+		t.Fatalf("ref = %q, want %q", got.Ref, "2")
 	}
 }
 

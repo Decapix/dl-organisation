@@ -15,16 +15,16 @@ func TestTheNotePaneFollowsTheCursor(t *testing.T) {
 		t.Fatalf("note pane = %q, want slot 1's note", m.note.View())
 	}
 
-	next, _ := m.Update(key('G')) // slot 12
+	next, _ := m.Update(key('G')) // slot 3
 	m = next.(Model)
 	if !strings.Contains(m.note.View(), "gamma note") {
-		t.Fatalf("note pane = %q, want slot 12's note", m.note.View())
+		t.Fatalf("note pane = %q, want slot 3's note", m.note.View())
 	}
 }
 
 func TestTheNotePaneIsEmptyForASlotWithoutOne(t *testing.T) {
 	m := newTestModel(&fakeSession{slots: threeSlots()})
-	next, _ := m.Update(key('j')) // slot 7, no note
+	next, _ := m.Update(key('j')) // slot 2, no note
 	m = next.(Model)
 	if strings.TrimSpace(m.note.View()) != "" {
 		t.Fatalf("note pane = %q, want empty", m.note.View())

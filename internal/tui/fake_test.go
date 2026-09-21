@@ -58,12 +58,13 @@ func (f *fakeSession) lastCommand() cli.Command {
 	return f.ran[len(f.ran)-1]
 }
 
-// threeSlots is the fixture most tests use: one with a note, one plain, one
-// named.
+// threeSlots is the fixture most tests use: one with a note, one plain and
+// unnamed, one named. The numbers are consecutive so that the row count
+// equals the slot count; gappySlots in rows_test.go covers the holes.
 func threeSlots() []slots.Slot {
 	return []slots.Slot{
 		{Number: 1, Name: "alpha", Path: "/home/u/alpha", Note: "first note\nsecond line"},
-		{Number: 7, Path: "/home/u/work/beta"},
-		{Number: 12, Name: "gamma", Path: "/home/u/gamma", Note: "gamma note"},
+		{Number: 2, Path: "/home/u/work/beta"},
+		{Number: 3, Name: "gamma", Path: "/home/u/gamma", Note: "gamma note"},
 	}
 }

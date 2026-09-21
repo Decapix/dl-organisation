@@ -46,9 +46,10 @@ func (m Model) View() string {
 
 // renderHeader is the title line with the slot count.
 func (m Model) renderHeader() string {
-	count := fmt.Sprintf("%d slot%s", len(m.view), plural(len(m.view)))
-	if len(m.view) != len(m.slots) {
-		count = fmt.Sprintf("%d of %d slots", len(m.view), len(m.slots))
+	shown := m.slotCount()
+	count := fmt.Sprintf("%d slot%s", shown, plural(shown))
+	if shown != len(m.slots) {
+		count = fmt.Sprintf("%d of %d slots", shown, len(m.slots))
 	}
 	left := styleHeader.Render("dl")
 	right := styleDim.Render(count)
@@ -98,31 +99,13 @@ func (m Model) renderList() string {
 	window := m.view[m.top:end]
 
 	var b strings.Builder
-	for j, sl := range window {
+	for j, r := range window {
 		i := m.top + j
 		cursor := "  "
 		if i == m.cursor {
 			cursor = styleCursor.Render("▸ ")
 		}
-		mark := " "
-		if sl.Note != "" {
-			mark = "*"
-		}
-		if !m.slotExists(sl) {
-			mark = styleDead.Render("x")
-		}
-
-		number := styleNumber.Render(fmt.Sprintf("%*d", numWidth, sl.Number))
-		name := fmt.Sprintf("%-*s", nameWidth, sl.DisplayName())
-
-		// Elide the path rather than letting truncate cut its tail: the tail
-		// is the part that identifies the project.
-		used := 2 + 1 + 1 + numWidth + 2 + nameWidth + 2
-		short := slots.ShortPath(sl.Path, m.session.HomeDir())
-		path := styleDim.Render(elidePath(short, width-used))
-
-		row := cursor + mark + " " + number + "  " + name + "  " + path
-		b.WriteString(truncate(row, width))
+		b.WriteString(truncate(cursor+m.renderRow(r, numWidth, nameWidth), width))
 		if j < len(window)-1 {
 			b.WriteByte('\n')
 		}
@@ -130,15 +113,51 @@ func (m Model) renderList() string {
 	return b.String()
 }
 
+// renderRow draws one line: a slot, or the free number(s) in its place.
+func (m Model) renderRow(r row, numWidth, nameWidth int) string {
+	if r.slot == nil {
+		// A collapsed run has no single number to sit in the number column,
+		// so it gets an ellipsis there and states its range instead.
+		if r.collapsed() {
+			return "  " + fmt.Sprintf("%*s", numWidth, "⋯") + "  " + styleDim.Render(r.label())
+		}
+		return "  " + styleDim.Render(fmt.Sprintf("%*d", numWidth, r.from)) + "  " +
+			styleDim.Render(r.label())
+	}
+
+	sl := *r.slot
+	mark := " "
+	if sl.Note != "" {
+		mark = "*"
+	}
+	if !m.slotExists(sl) {
+		mark = styleDead.Render("x")
+	}
+
+	number := styleNumber.Render(fmt.Sprintf("%*d", numWidth, sl.Number))
+	name := fmt.Sprintf("%-*s", nameWidth, sl.DisplayName())
+
+	// Elide the path rather than letting truncate cut its tail: the tail is
+	// the part that identifies the project.
+	used := 2 + 1 + 1 + numWidth + 2 + nameWidth + 2
+	short := slots.ShortPath(sl.Path, m.session.HomeDir())
+	path := styleDim.Render(elidePath(short, listPaneWidth(m.width)-used))
+
+	return mark + " " + number + "  " + name + "  " + path
+}
+
 // columnWidths measures the number and name columns, capping names so that a
 // single long name cannot squeeze every path off the screen.
 func (m Model) columnWidths() (numWidth, nameWidth int) {
 	const maxName = 20
-	for _, sl := range m.view {
-		if w := len(strconv.Itoa(sl.Number)); w > numWidth {
+	for _, r := range m.view {
+		if w := len(strconv.Itoa(r.to)); w > numWidth {
 			numWidth = w
 		}
-		if w := lipgloss.Width(sl.DisplayName()); w > nameWidth {
+		if r.slot == nil {
+			continue // an empty row has no name to measure
+		}
+		if w := lipgloss.Width(r.slot.DisplayName()); w > nameWidth {
 			nameWidth = w
 		}
 	}
