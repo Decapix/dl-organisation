@@ -1,4 +1,6 @@
 # dl shell integration for fish. See the zsh version for why a temp file is
+# Install with:  dl init fish | source   in config.fish, AFTER your PATH setup
+# (it runs the dl binary, so dl must already be on $PATH).
 # used instead of capturing stdout.
 function dl
     set -l cdfile (mktemp)

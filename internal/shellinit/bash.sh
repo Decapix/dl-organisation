@@ -1,4 +1,6 @@
 # dl shell integration for bash. See the zsh version for why a temp file is
+# Install with:  eval "$(dl init bash)"   in ~/.bashrc, AFTER your PATH exports
+# (the eval runs the dl binary, so dl must already be on $PATH).
 # used instead of capturing stdout.
 dl() {
   local cdfile rc

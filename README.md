@@ -37,7 +37,13 @@ shell:
 | bash | `eval "$(dl init bash)"` | `~/.bashrc` |
 | fish | `dl init fish \| source` | `~/.config/fish/config.fish` |
 
-Without it `dl 7` prints the path instead of taking you there.
+**Put it after your `PATH` setup**, near the end of the file. The line runs the
+`dl` binary, so if it comes before the export that puts `go install`'s output
+directory on your `PATH`, your shell reports `command not found: dl` at startup
+and the integration is silently never installed.
+
+Without the integration, `dl 7` prints the path and a hint instead of taking
+you there.
 
 ## Usage
 
