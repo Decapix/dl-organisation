@@ -5,6 +5,7 @@ lets you jump back with four keystrokes, and — the part that makes it more tha
 a bookmark manager — prints the note you left there when you arrive.
 
 ```
+$ dl                                 # the browser
 $ cd ~/work/scraper
 $ dl -z 12 -n scraping -m "pagination stops at p.4, fix the retry loop"
 slot 12 -> ~/work/scraper
@@ -70,6 +71,43 @@ OTHER
 Every action has its own help page with its options and real examples:
 `dl -z --help`, `dl -s --help`, and so on.
 
+## The browser
+
+`dl` with no arguments opens an interactive browser: the list on the left, the
+selected slot's note in full on the right.
+
+```
+ dl                                                    12 slots
+
+    1  coloriage   ~/…/coloriage/svg          │ scraping
+  * 4  ir-landing  ~/…/new-landing-ir         │ ~/…/ou.you/dev/scrapping
+  * 7  exam42      ~/…/solutions/s4/level1    │ ────────────────────────
+ ▸*12  scraping    ~/…/ou.you/dev/scrapping   │ scraper the listing pages
+    9  mev-scan    ~/…/code/doc-scan-code     │ pagination stops at p.4
+    8  home        ~                          │
+  x 6  bergens     ~/…/code/bergens_code      │ -> fix the retry loop
+
+ ↑↓ move  ⏎ cd  / find  e edit  n name  a add  d del  ? help
+```
+
+| Key | Action |
+|-----|--------|
+| `↑` `↓` `j` `k` `g` `G` | move |
+| `⏎` | cd into the slot and quit |
+| `/` | filter by name, path **or note text** |
+| `e` | edit the note in `$EDITOR` |
+| `n` | rename in place |
+| `a` | save the current directory to the lowest free slot |
+| `d` `r` | delete / clear name and note — both ask first |
+| `ctrl-d` `ctrl-u` | scroll a long note |
+| `?` | every key |
+| `q` `ctrl-c` | quit without moving |
+
+Paths are elided in the middle, keeping the end, because the end is what tells
+you which project a row is. Below 80 columns the note moves under the list;
+below 60 it is dropped. A browser left open holds no lock, so `dl -z` in
+another shell never waits on it.
+
 ## Slots, names and notes
 
 A slot holds three things:
@@ -101,7 +139,7 @@ or `-d` to remove the slot.
 | `stl7 -d` | `dl -z 7 -e` |
 | `cdl7 -d` | `dl -e 7` |
 | `cdl7 -sd` | `dl -s -l` |
-| `seedl` | `dl -s` |
+| `seedl` | `dl -s` or `dl` |
 
 The first run imports `~/.cdl` automatically: each slot keeps its number and
 path, and the old comment and `descriptions/<N>.txt` file are merged into one
