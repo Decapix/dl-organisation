@@ -95,7 +95,7 @@ selected slot's note in full on the right.
   * 7  exam42       ~/…/exam5/s4/level1        │
    40  far          ~/…/somewhere/far          │
 
- ↑↓ move  ⏎ cd  / find  e edit  n name  a add  d del  c compact  ? help
+ ↑↓  ⏎ cd  / find  e edit  n name  o organize  a add  d del  c compact  ? help
 ```
 
 Deleted slots stay on screen as empty rows, because the numbers are the
