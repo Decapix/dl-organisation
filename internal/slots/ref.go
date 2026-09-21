@@ -41,16 +41,23 @@ func ParseSlotNumber(ref string) (int, bool) {
 	return n, true
 }
 
-// Resolve turns a user-supplied reference into a slot, in this order:
+// Resolve turns a user-supplied reference into a slot.
 //
-//  1. an in-range number   -> that slot, or an "empty" error
-//  2. an exact name        -> that slot (case-insensitive)
-//  3. a unique name prefix -> that slot
-//  4. several prefixes     -> *AmbiguousRefError listing them
-//  5. anything else        -> not found
+// A number in range is looked up directly and never falls through to the name
+// rules, so numbers and names can never shadow each other. Anything else is
+// matched against names in four tiers, most specific first:
 //
-// Rule 1 never falls through to the name rules, so numbers and names can never
-// shadow each other.
+//  1. exact match on an explicit name
+//  2. exact match on a display name (a slot's directory base name)
+//  3. prefix match on an explicit name
+//  4. prefix match on a display name
+//
+// The first tier with any match decides; several matches inside one tier is an
+// *AmbiguousRefError listing them. Matching display names is what makes an
+// unnamed slot reachable by what the listing shows for it, which matters right
+// after an import from ~/.cdl where every slot arrives unnamed. Keeping
+// explicit names in their own tiers means a name you chose always beats one
+// derived from a path.
 func (s *Store) Resolve(ref string) (Slot, error) {
 	if n, ok := ParseSlotNumber(ref); ok {
 		sl, exists := s.Get(n)
@@ -64,25 +71,32 @@ func (s *Store) Resolve(ref string) (Slot, error) {
 	}
 
 	needle := strings.ToLower(ref)
-	var prefixes []Slot
+	var exactName, exactDisplay, prefixName, prefixDisplay []Slot
 	for _, sl := range s.All() {
 		name := strings.ToLower(sl.Name)
-		if name == "" {
+		display := strings.ToLower(sl.DisplayName())
+
+		switch {
+		case name != "" && name == needle:
+			exactName = append(exactName, sl)
+		case display == needle:
+			exactDisplay = append(exactDisplay, sl)
+		case name != "" && strings.HasPrefix(name, needle):
+			prefixName = append(prefixName, sl)
+		case strings.HasPrefix(display, needle):
+			prefixDisplay = append(prefixDisplay, sl)
+		}
+	}
+
+	for _, tier := range [][]Slot{exactName, exactDisplay, prefixName, prefixDisplay} {
+		switch len(tier) {
+		case 0:
 			continue
-		}
-		if name == needle {
-			return sl, nil // exact match wins outright
-		}
-		if strings.HasPrefix(name, needle) {
-			prefixes = append(prefixes, sl)
+		case 1:
+			return tier[0], nil
+		default:
+			return Slot{}, &AmbiguousRefError{Ref: ref, Candidates: tier}
 		}
 	}
-	switch len(prefixes) {
-	case 1:
-		return prefixes[0], nil
-	case 0:
-		return Slot{}, fmt.Errorf("no slot matches %q; list them with: dl -s", ref)
-	default:
-		return Slot{}, &AmbiguousRefError{Ref: ref, Candidates: prefixes}
-	}
+	return Slot{}, fmt.Errorf("no slot matches %q; list them with: dl -s", ref)
 }

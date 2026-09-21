@@ -94,6 +94,56 @@ func TestExactNameBeatsPrefix(t *testing.T) {
 	}
 }
 
+// An unnamed slot is still reachable by its directory's base name, which is
+// what the listing displays for it. Without this, every slot imported from
+// ~/.cdl would be number-only despite showing a name.
+func TestResolveMatchesTheBasenameOfAnUnnamedSlot(t *testing.T) {
+	st := refFixture(t)
+	got, err := st.Resolve("unnamed")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Number != 3 {
+		t.Fatalf("Number = %d, want 3", got.Number)
+	}
+	// And by a unique prefix of it.
+	if got, err = st.Resolve("unn"); err != nil || got.Number != 3 {
+		t.Fatalf("Resolve(\"unn\") = (%d, %v), want (3, nil)", got.Number, err)
+	}
+}
+
+// Two unnamed slots in directories with the same base name are ambiguous, and
+// the error must list both so the user can pick a number.
+func TestResolveReportsAmbiguousBasenames(t *testing.T) {
+	st := refFixture(t)
+	st.Put(Slot{Number: 21, Path: "/a/shared"})
+	st.Put(Slot{Number: 22, Path: "/b/shared"})
+
+	_, err := st.Resolve("shared")
+	var amb *AmbiguousRefError
+	if !errors.As(err, &amb) {
+		t.Fatalf("error = %v (%T), want *AmbiguousRefError", err, err)
+	}
+	if len(amb.Candidates) != 2 {
+		t.Fatalf("Candidates = %v, want 2", amb.Candidates)
+	}
+}
+
+// An explicit name still wins over another slot's base name.
+func TestExplicitNameBeatsABasename(t *testing.T) {
+	st := refFixture(t)
+	st.Put(Slot{Number: 30, Name: "target", Path: "/x/other"})
+	st.Put(Slot{Number: 31, Path: "/y/target"})
+
+	got, err := st.Resolve("target")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Number != 30 {
+		t.Fatalf("Number = %d, want 30 (the explicitly named slot)", got.Number)
+	}
+}
+
 func TestResolveUnknown(t *testing.T) {
 	st := refFixture(t)
 	if _, err := st.Resolve("nope"); err == nil {
