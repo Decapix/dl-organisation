@@ -73,7 +73,7 @@ func run(argv []string) int {
 	return exitOK
 }
 
-// runStoreCommand opens the store and dispatches everything that needs it.
+// runStoreCommand builds a Session and dispatches through it.
 func runStoreCommand(cmd cli.Command) error {
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -90,51 +90,27 @@ func runStoreCommand(cmd cli.Command) error {
 			n, pluralS(n))
 	}
 
-	// Read-only commands skip the write lock so they never block behind a
-	// long-running edit in another shell.
-	var store *slots.Store
-	if writes(cmd.Action) {
-		store, err = slots.OpenForUpdate(dir)
-	} else {
-		store, err = slots.Open(dir)
-	}
-	if err != nil {
-		return err
-	}
-	defer store.Close()
-
 	cwd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("locate the current directory: %w", err)
 	}
 
-	env := &actions.Env{
-		Store:  store,
-		Out:    os.Stdout,
-		Err:    os.Stderr,
-		Cwd:    cwd,
+	session := &actions.Session{
+		Dir:    dir,
 		Home:   home,
+		Cwd:    cwd,
 		CDFile: os.Getenv("DL_CD_FILE"),
 		Editor: editor.OS{},
 		Now:    time.Now,
+		Err:    os.Stderr,
 	}
 
-	// The interactive browser arrives in phase 2. Until then a bare `dl` does
-	// the most useful thing it can, which is to list.
+	// The interactive browser arrives in task 8. Until then a bare `dl`
+	// still falls back to listing.
 	if cmd.Action == cli.ActionTUI {
 		cmd.Action = cli.ActionSee
 	}
-	return actions.Run(env, cmd)
-}
-
-// writes reports whether an action needs the write lock.
-func writes(a cli.Action) bool {
-	switch a {
-	case cli.ActionSet, cli.ActionEdit, cli.ActionReset, cli.ActionDelete,
-		cli.ActionRename, cli.ActionSetNote:
-		return true
-	}
-	return false
+	return session.Run(cmd, os.Stdout)
 }
 
 // helpPointer renders the action name for the "see: dl ... --help" line.
