@@ -15,7 +15,7 @@ import (
 // filter input, the rename input, a confirmation or the last status message.
 func (m Model) View() string {
 	if m.mode == modeHelp {
-		return helpOverlay
+		return renderHelpOverlay()
 	}
 	if m.width == 0 {
 		return "" // no size yet; bubbletea sends one immediately
@@ -200,7 +200,7 @@ func (m Model) renderFooter() string {
 				"moving slot %d — space drops it here, esc cancels", m.picked))
 		}
 	default:
-		prompt = styleDim.Render(keyHints)
+		prompt = renderHints()
 	}
 	return status + "\n" + truncate(prompt, m.width)
 }

@@ -10,6 +10,13 @@ var (
 			Bold(true).
 			Foreground(lipgloss.AdaptiveColor{Light: "#5a4fcf", Dark: "#b4a7ff"})
 
+	// styleKey is what makes the footer legend readable: without it the keys
+	// and their labels are the same grey and the line reads as one run-on
+	// phrase.
+	styleKey = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.AdaptiveColor{Light: "#0b6e6e", Dark: "#5fd7d7"})
+
 	styleCursor = lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.AdaptiveColor{Light: "#1a1a1a", Dark: "#ffffff"})

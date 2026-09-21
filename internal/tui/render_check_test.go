@@ -9,6 +9,14 @@ import (
 	"github.com/Decapix/dl-organisation/internal/slots"
 )
 
+// TestRenderHelp prints the ? overlay so its layout can be looked at.
+func TestRenderHelp(t *testing.T) {
+	if os.Getenv("DL_RENDER_HELP") == "" {
+		t.Skip("DL_RENDER_HELP not set")
+	}
+	t.Logf("\n%s\n", renderHelpOverlay())
+}
+
 // TestRenderOrganize prints the browser mid-move, so the held marker and the
 // footer can be looked at.
 func TestRenderOrganize(t *testing.T) {
