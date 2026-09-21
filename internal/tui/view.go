@@ -21,12 +21,27 @@ func (m Model) View() string {
 		return "" // no size yet; bubbletea sends one immediately
 	}
 
-	return strings.Join([]string{
-		m.renderHeader(),
-		"",
-		m.renderBody(),
-		m.renderFooter(),
-	}, "\n")
+	lines := []string{m.renderHeader(), ""}
+	lines = append(lines, strings.Split(m.renderBody(), "\n")...)
+	lines = append(lines, strings.Split(m.renderFooter(), "\n")...)
+
+	// On a terminal too short for even the chrome, give up body rows rather
+	// than the header and the footer: those are what tell you where you are
+	// and what you can press.
+	if m.height > 0 && len(lines) > m.height {
+		const headerLines, footerLines = 2, 2
+		body := len(lines) - headerLines - footerLines
+		drop := len(lines) - m.height
+		if drop > body {
+			drop = body
+		}
+		lines = append(lines[:headerLines], lines[headerLines+drop:]...)
+		// Still too tall means there is no room for the chrome either.
+		if len(lines) > m.height {
+			lines = lines[len(lines)-m.height:]
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 // renderHeader is the title line with the slot count.
@@ -133,21 +148,32 @@ func (m Model) columnWidths() (numWidth, nameWidth int) {
 	return numWidth, nameWidth
 }
 
-// renderFooter shows whichever prompt the current mode needs, falling back to
-// the last status message and then to the key hints.
+// renderFooter is always exactly two lines: what just happened, and what you
+// can do next.
+//
+// Giving the status its own line is what keeps the key hints on screen. An
+// earlier version let a status message take the footer over, so renaming one
+// slot cost you the hints for the rest of the session. The line is rendered
+// blank rather than omitted so that a message appearing never shifts the
+// layout.
 func (m Model) renderFooter() string {
+	status := ""
+	if m.status != "" {
+		status = truncate(styleStatus.Render(m.status), m.width)
+	}
+
+	var prompt string
 	switch m.mode {
 	case modeFilter:
-		return truncate(m.filter.View(), m.width)
+		prompt = m.filter.View()
 	case modeRename:
-		return truncate(m.rename.View(), m.width)
+		prompt = m.rename.View()
 	case modeConfirm:
-		return truncate(styleStatus.Render(m.confirmPrompt), m.width)
+		prompt = styleStatus.Render(m.confirmPrompt)
+	default:
+		prompt = styleDim.Render(keyHints)
 	}
-	if m.status != "" {
-		return truncate(styleStatus.Render(m.status), m.width)
-	}
-	return truncate(styleDim.Render(keyHints), m.width)
+	return status + "\n" + truncate(prompt, m.width)
 }
 
 // truncate cuts a rendered string to a visible width. It measures with

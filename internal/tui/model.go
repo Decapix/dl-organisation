@@ -45,7 +45,8 @@ const (
 	wideMin   = 80
 	narrowMin = 60
 
-	chromeRows = 4 // header, blank line, footer, and the status line
+	// header, its blank line, and the footer's two rows (status and hints).
+	chromeRows = 4
 )
 
 // listPaneWidth is how wide the list pane gets. The list takes the larger
@@ -292,7 +293,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // handleKey routes a keypress to the current mode.
+//
+// It clears the status first: a message about something you did three
+// keystrokes ago is noise. An action that sets a new one does so after this
+// point, so a key never wipes its own message.
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	m.status = ""
 	if m.mode == modeHelp {
 		m.mode = modeList // any key closes the overlay
 		return m, nil
