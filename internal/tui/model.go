@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/Decapix/dl-organisation/internal/cli"
@@ -35,6 +36,45 @@ const (
 	modeHelp
 )
 
+// Layout constants. Below wideMin the note moves under the list; below
+// narrowMin it is dropped entirely.
+const (
+	wideMin   = 80
+	narrowMin = 60
+
+	chromeRows = 4 // header, blank line, footer, and the status line
+)
+
+// listPaneWidth is how wide the list pane gets. The list takes the larger
+// share because a truncated path is harder to recognise than a wrapped note.
+func listPaneWidth(total int) int {
+	if total >= wideMin {
+		return total * 55 / 100
+	}
+	return total - 2
+}
+
+// notePaneWidth is how wide the note pane gets at a given terminal width.
+func notePaneWidth(total int) int {
+	w := total - 2
+	if total >= wideMin {
+		w = total - listPaneWidth(total) - 3 // gap, border and padding
+	}
+	if w < 1 {
+		return 1
+	}
+	return w
+}
+
+// paneHeight is how many rows a pane gets.
+func paneHeight(total int) int {
+	h := total - chromeRows
+	if h < 1 {
+		return 1
+	}
+	return h
+}
+
 // Model is the browser's whole state.
 type Model struct {
 	session Session
@@ -49,6 +89,10 @@ type Model struct {
 	// filter is the query typed after `/`. It stays applied when the user
 	// returns to the list, so you can filter and then act on what is left.
 	filter textinput.Model
+
+	// note is the right-hand pane. It is a viewport so that a note longer
+	// than the screen can be scrolled rather than truncated.
+	note viewport.Model
 
 	width, height int
 
@@ -111,6 +155,19 @@ func (m Model) selected() *slots.Slot {
 func (m *Model) applyFilter() {
 	m.view = filterSlots(m.slots, m.filter.Value())
 	m.clampCursor()
+	m.syncNote()
+}
+
+// syncNote points the note pane at the selected slot and rewinds it to the
+// top, so moving to another slot never lands you halfway down its note.
+func (m *Model) syncNote() {
+	sl := m.selected()
+	if sl == nil {
+		m.note.SetContent("")
+	} else {
+		m.note.SetContent(sl.Note)
+	}
+	m.note.GotoTop()
 }
 
 // clampCursor keeps the cursor inside the view after it changes size.
@@ -129,6 +186,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
+		m.note.Width = notePaneWidth(msg.Width)
+		m.note.Height = paneHeight(msg.Height)
+		m.syncNote()
 		return m, nil
 
 	case reloadMsg:
@@ -167,18 +227,29 @@ func (m Model) handleListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "up", "k":
 		m.cursor--
 		m.clampCursor()
+		m.syncNote()
 		return m, nil
 	case "down", "j":
 		if m.cursor < len(m.view)-1 {
 			m.cursor++
 		}
+		m.syncNote()
 		return m, nil
 	case "g", "home":
 		m.cursor = 0
+		m.syncNote()
 		return m, nil
 	case "G", "end":
 		m.cursor = len(m.view) - 1
 		m.clampCursor()
+		m.syncNote()
+		return m, nil
+
+	case "ctrl+d", "pgdown":
+		m.note.HalfViewDown()
+		return m, nil
+	case "ctrl+u", "pgup":
+		m.note.HalfViewUp()
 		return m, nil
 
 	case "/":
