@@ -69,9 +69,40 @@ func notePaneWidth(total int) int {
 	return w
 }
 
-// paneHeight is how many rows a pane gets.
-func paneHeight(total int) int {
-	h := total - chromeRows
+// bodyRows is how many rows the list and the note have to share, after the
+// header, its blank line and the footer are taken out.
+func bodyRows(height int) int {
+	h := height - chromeRows
+	if h < 1 {
+		return 1
+	}
+	return h
+}
+
+// listRows is how many slot rows fit on screen. Side by side the list gets
+// the whole body; stacked it gets the larger share, because the list is what
+// you steer with and the note can be scrolled.
+func listRows(width, height int) int {
+	body := bodyRows(height)
+	if width >= wideMin || width < narrowMin {
+		return body
+	}
+	rows := body * 60 / 100
+	if rows < 1 {
+		return 1
+	}
+	return rows
+}
+
+// notePaneHeight is how many rows the note pane gets.
+func notePaneHeight(width, height int) int {
+	if width < narrowMin {
+		return 0 // no note pane at all
+	}
+	if width >= wideMin {
+		return bodyRows(height)
+	}
+	h := bodyRows(height) - listRows(width, height)
 	if h < 1 {
 		return 1
 	}
@@ -85,6 +116,11 @@ type Model struct {
 	slots  []slots.Slot // everything the store holds
 	view   []slots.Slot // what the current filter admits
 	cursor int          // index into view
+
+	// top is the first row of view that is on screen. The list is windowed
+	// rather than drawn whole: a full-screen program that renders more lines
+	// than the terminal has scrolls its own footer away.
+	top int
 
 	mode   mode
 	status string // the last action's output or error, shown in the footer
@@ -172,6 +208,7 @@ func (m Model) selected() *slots.Slot {
 func (m *Model) applyFilter() {
 	m.view = filterSlots(m.slots, m.filter.Value())
 	m.clampCursor()
+	m.scrollToCursor()
 	m.syncNote()
 }
 
@@ -197,6 +234,28 @@ func (m *Model) clampCursor() {
 	}
 }
 
+// scrollToCursor moves the window the minimum distance needed to bring the
+// cursor back on screen, so stepping through a long list never jumps.
+func (m *Model) scrollToCursor() {
+	rows := listRows(m.width, m.height)
+	if rows < 1 {
+		rows = 1
+	}
+	if m.cursor < m.top {
+		m.top = m.cursor
+	}
+	if m.cursor >= m.top+rows {
+		m.top = m.cursor - rows + 1
+	}
+	// A shorter list than the window means there is nothing to scroll past.
+	if max := len(m.view) - rows; m.top > max {
+		m.top = max
+	}
+	if m.top < 0 {
+		m.top = 0
+	}
+}
+
 // Update is the state machine. Every branch returns a new Model; nothing is
 // mutated through a pointer receiver from here.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -204,7 +263,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 		m.note.Width = notePaneWidth(msg.Width)
-		m.note.Height = paneHeight(msg.Height)
+		m.note.Height = notePaneHeight(msg.Width, msg.Height)
+		m.scrollToCursor()
 		m.syncNote()
 		return m, nil
 
@@ -257,21 +317,25 @@ func (m Model) handleListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "up", "k":
 		m.cursor--
 		m.clampCursor()
+		m.scrollToCursor()
 		m.syncNote()
 		return m, nil
 	case "down", "j":
 		if m.cursor < len(m.view)-1 {
 			m.cursor++
 		}
+		m.scrollToCursor()
 		m.syncNote()
 		return m, nil
 	case "g", "home":
 		m.cursor = 0
+		m.scrollToCursor()
 		m.syncNote()
 		return m, nil
 	case "G", "end":
 		m.cursor = len(m.view) - 1
 		m.clampCursor()
+		m.scrollToCursor()
 		m.syncNote()
 		return m, nil
 

@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // captureRun runs the program with argv and returns stdout, stderr and the
@@ -207,5 +208,27 @@ func TestMigrationHappensOnFirstRun(t *testing.T) {
 	}
 	if _, err := os.Stat(cdl + ".bak"); err != nil {
 		t.Errorf("~/.cdl.bak missing: %v", err)
+	}
+}
+
+// A bare `dl` opens the browser, which wants a terminal. Under `go test`
+// there is none. Whether bubbletea errors out or reads EOF and exits cleanly
+// is its business; what this test pins is that the binary terminates, does
+// not panic, and reports a code we recognise. Asserting a specific code here
+// would be asserting a dependency's internals.
+func TestBareDlWithoutATerminalTerminates(t *testing.T) {
+	setupEnv(t)
+	done := make(chan int, 1)
+	go func() {
+		_, _, code := captureRun(t)
+		done <- code
+	}()
+	select {
+	case code := <-done:
+		if code != exitOK && code != exitFailure {
+			t.Fatalf("exit code = %d, want 0 or 1", code)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("a bare dl hung with no terminal")
 	}
 }

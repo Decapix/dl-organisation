@@ -20,6 +20,8 @@ type fakeSession struct {
 	output string
 	// slotsErr, when non-nil, is what Slots returns.
 	slotsErr error
+	// home overrides HomeDir; empty means the default fixture home.
+	home string
 }
 
 func (f *fakeSession) Slots() ([]slots.Slot, error) {
@@ -41,7 +43,12 @@ func (f *fakeSession) Run(cmd cli.Command, out io.Writer) error {
 }
 
 func (f *fakeSession) CurrentDir() string { return "/home/u/work" }
-func (f *fakeSession) HomeDir() string    { return "/home/u" }
+func (f *fakeSession) HomeDir() string {
+	if f.home != "" {
+		return f.home
+	}
+	return "/home/u"
+}
 
 // lastCommand is the most recent command the model issued.
 func (f *fakeSession) lastCommand() cli.Command {

@@ -17,7 +17,12 @@ import (
 	"github.com/Decapix/dl-organisation/internal/editor"
 	"github.com/Decapix/dl-organisation/internal/shellinit"
 	"github.com/Decapix/dl-organisation/internal/slots"
+	"github.com/Decapix/dl-organisation/internal/tui"
 )
+
+// actions.Session must satisfy the browser's interface. The assertion lives
+// here because neither package may import the other.
+var _ tui.Session = (*actions.Session)(nil)
 
 // version is overridden at build time with -ldflags "-X main.version=...".
 var version = "dev"
@@ -105,10 +110,11 @@ func runStoreCommand(cmd cli.Command) error {
 		Err:    os.Stderr,
 	}
 
-	// The interactive browser arrives in task 8. Until then a bare `dl`
-	// still falls back to listing.
+	// A bare `dl` opens the browser. It is not a store command, so it does
+	// not go through session.Run: the browser drives the session itself, one
+	// command at a time.
 	if cmd.Action == cli.ActionTUI {
-		cmd.Action = cli.ActionSee
+		return tui.Run(session, os.Stdout)
 	}
 	return session.Run(cmd, os.Stdout)
 }
