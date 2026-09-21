@@ -19,6 +19,7 @@ const (
 	ActionPath                  // dl -p <ref>
 	ActionRename                // dl -n <ref> <name>
 	ActionSetNote               // dl -m <ref> <text>
+	ActionCompact               // dl --compact
 	ActionDoctor                // dl doctor
 	ActionInit                  // dl init <shell>
 	ActionHelp                  // dl -h, dl <action> -h
@@ -48,6 +49,8 @@ func (a Action) String() string {
 		return "--name"
 	case ActionSetNote:
 		return "--note"
+	case ActionCompact:
+		return "--compact"
 	case ActionDoctor:
 		return "doctor"
 	case ActionInit:

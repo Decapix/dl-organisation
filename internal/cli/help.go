@@ -31,6 +31,7 @@ ACTIONS
   -m, --note   <ref> <text>   replace a slot's note inline
 
 OTHER
+      --compact           renumber the slots to close the gaps
   doctor                  report slots whose path is gone
   init <shell>            print the shell integration (zsh, bash, fish)
   -h, --help              this page; -h after an action for its details
@@ -153,6 +154,20 @@ EXAMPLES
 EXAMPLES
   dl -m 7 "waiting on the API fix"
   dl -m exam42 ""         clear the note
+`,
+
+	ActionCompact: `dl --compact — renumber the slots to close the gaps
+
+  Deleting slot 2 out of 1, 2, 3 leaves a hole. --compact slides the
+  rest down so the numbers run 1, 2, 3 again, in the same order and
+  with every name and note carried across.
+
+  It changes numbers you may have memorised, so the moves are printed.
+  There is no undo; the paths and notes are untouched either way.
+
+EXAMPLES
+  dl --compact
+  dl -s                   check the new numbers
 `,
 
 	ActionDoctor: `dl doctor — report slots whose path is gone

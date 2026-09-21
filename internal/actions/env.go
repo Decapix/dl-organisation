@@ -78,6 +78,8 @@ func Run(env *Env, cmd cli.Command) error {
 		return Rename(env, cmd)
 	case cli.ActionSetNote:
 		return SetNote(env, cmd)
+	case cli.ActionCompact:
+		return Compact(env, cmd)
 	case cli.ActionDoctor:
 		return Doctor(env, cmd)
 	}

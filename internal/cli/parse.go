@@ -45,7 +45,7 @@ func Parse(argv []string) (Command, error) {
 		help        bool
 		// which flags were seen
 		cd, set, see, edit, reset, del, path, rename, note bool
-		long, quiet, version                               bool
+		compact, long, quiet, version                      bool
 	)
 
 	// An explicit index rather than a range loop: value-taking flags advance
@@ -92,6 +92,8 @@ func Parse(argv []string) (Command, error) {
 			set = true
 		case "-s", "--see":
 			see = true
+		case "--compact":
+			compact = true
 		case "-d", "--delete":
 			del = true
 		case "-p", "--path":
@@ -156,6 +158,7 @@ func Parse(argv []string) (Command, error) {
 	countIf(see, ActionSee)
 	countIf(del, ActionDelete)
 	countIf(path, ActionPath)
+	countIf(compact, ActionCompact)
 	if !set {
 		countIf(edit, ActionEdit)
 		countIf(reset, ActionReset)
@@ -236,7 +239,7 @@ func validate(cmd *Command, pos []string, long, quiet bool) error {
 			return err
 		}
 		cmd.Ref, cmd.Note = pos[0], pos[1]
-	case ActionSee, ActionTUI:
+	case ActionSee, ActionTUI, ActionCompact:
 		if err := want(0, "no arguments"); err != nil {
 			return err
 		}

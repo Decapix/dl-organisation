@@ -52,6 +52,9 @@ func TestParseTable(t *testing.T) {
 		{"set note as an action", []string{"-m", "7", "fix the loop"},
 			Command{Action: ActionSetNote, Ref: "7", Note: "fix the loop"}},
 
+		{"compact", []string{"--compact"}, Command{Action: ActionCompact}},
+		{"compact help", []string{"--compact", "-h"},
+			Command{Action: ActionHelp, HelpFor: ActionCompact}},
 		{"doctor", []string{"doctor"}, Command{Action: ActionDoctor}},
 		{"init", []string{"init", "zsh"}, Command{Action: ActionInit, Shell: "zsh"}},
 		{"version", []string{"--version"}, Command{Action: ActionVersion}},
@@ -96,6 +99,8 @@ func TestParseErrors(t *testing.T) {
 		{"set note without text", []string{"-m", "7"}},
 		{"too many positionals", []string{"7", "8"}},
 		{"see takes no ref", []string{"-s", "7"}},
+		{"compact takes no ref", []string{"--compact", "7"}},
+		{"compact is an action of its own", []string{"--compact", "-s"}},
 		{"long and quiet together", []string{"-s", "-l", "-q"}},
 		{"name modifier without a value", []string{"-z", "7", "-n"}},
 		{"note modifier without a value", []string{"-z", "7", "-m"}},

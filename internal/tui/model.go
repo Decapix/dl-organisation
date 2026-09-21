@@ -457,6 +457,15 @@ func (m Model) handleListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.rename.Focus()
 		return m, textinput.Blink
 
+	case "c":
+		// Compacting is about the whole store, so it works from any row,
+		// including an empty one. It asks first because it changes numbers
+		// you have in your fingers.
+		m.mode = modeConfirm
+		m.confirmPrompt = "renumber every slot to close the gaps? [y/N]"
+		m.confirmCmd = cli.Command{Action: cli.ActionCompact}
+		return m, nil
+
 	case "/":
 		m.mode = modeFilter
 		m.filter.Focus()

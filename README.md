@@ -68,6 +68,7 @@ ACTIONS
   -m, --note   <ref> <text>   replace a slot's note inline
 
 OTHER
+      --compact           renumber the slots to close the gaps
   doctor                  report slots whose path is gone
   init <shell>            print the shell integration (zsh, bash, fish)
   -h, --help              this page; -h after an action for its details
@@ -83,18 +84,25 @@ Every action has its own help page with its options and real examples:
 selected slot's note in full on the right.
 
 ```
- dl                                                    12 slots
+ dl                                                          5 slots
 
-    1  coloriage   ~/…/coloriage/svg          │ scraping
-  * 4  ir-landing  ~/…/new-landing-ir         │ ~/…/ou.you/dev/scrapping
-  * 7  exam42      ~/…/solutions/s4/level1    │ ────────────────────────
- ▸*12  scraping    ~/…/ou.you/dev/scrapping   │ scraper the listing pages
-    9  mev-scan    ~/…/code/doc-scan-code     │ pagination stops at p.4
-    8  home        ~                          │
-  x 6  bergens     ~/…/code/bergens_code      │ -> fix the retry loop
+    1  coloriage    ~/…/coloriage/svg          │ slot 3 is empty
+  * 2  cpp08        ~/…/code/cpp/cpp08         │
+ ▸  3  empty                                   │ press a to save the
+  * 4  ir-landing   ~/…/new-landing-ir         │ current directory here
+    ⋯  5–6 empty                               │
+  * 7  exam42       ~/…/exam5/s4/level1        │
+   40  far          ~/…/somewhere/far          │
 
- ↑↓ move  ⏎ cd  / find  e edit  n name  a add  d del  ? help
+ ↑↓ move  ⏎ cd  / find  e edit  n name  a add  d del  c compact  ? help
 ```
+
+Deleted slots stay on screen as empty rows, because the numbers are the
+interface: seeing that 3 is free is what tells you the number is available.
+Press `a` on one to save the current directory into exactly that slot. A run
+of three or more free numbers collapses to one row, so a store using slots 1
+and 500 does not become 498 blank lines. The list stops at the last occupied
+slot.
 
 | Key | Action |
 |-----|--------|
@@ -105,6 +113,7 @@ selected slot's note in full on the right.
 | `n` | rename in place |
 | `a` | save the current directory to the lowest free slot |
 | `d` `r` | delete / clear name and note — both ask first |
+| `c` | renumber every slot to close the gaps — asks first |
 | `ctrl-d` `ctrl-u` | scroll a long note |
 | `?` | every key |
 | `q` `ctrl-c` | quit without moving |
@@ -134,6 +143,21 @@ ones.
 Nothing is ever destroyed implicitly. Saving over an occupied slot replaces the
 path and **keeps** the name and the note — you have to type `-r` to clear them
 or `-d` to remove the slot.
+
+## Closing the gaps
+
+Deleting slots leaves holes: `1, 4, 9`. `dl --compact` slides everything down
+to `1, 2, 3`, in the same order, carrying every name and note across. It
+prints what moved, because the numbers are what you type:
+
+```
+$ dl --compact
+compacted 3 slots
+  4 -> 2
+  9 -> 3
+```
+
+`c` does the same from the browser.
 
 ## Coming from stl / cdl / seedl
 

@@ -10,8 +10,8 @@ import (
 func TestEveryActionHasHelp(t *testing.T) {
 	actions := []Action{
 		ActionTUI, ActionCD, ActionSet, ActionSee, ActionEdit, ActionReset,
-		ActionDelete, ActionPath, ActionRename, ActionSetNote, ActionDoctor,
-		ActionInit,
+		ActionDelete, ActionPath, ActionRename, ActionSetNote, ActionCompact,
+		ActionDoctor, ActionInit,
 	}
 	for _, a := range actions {
 		got := Help(a)
@@ -28,7 +28,7 @@ func TestGlobalHelpListsEveryAction(t *testing.T) {
 	got := Help(ActionTUI)
 	for _, want := range []string{
 		"--cd", "--set", "--see", "--edit", "--reset", "--delete", "--path",
-		"--name", "--note", "doctor", "init", "--help", "--version",
+		"--name", "--note", "--compact", "doctor", "init", "--help", "--version",
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("global help does not mention %q", want)
