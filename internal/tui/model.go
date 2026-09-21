@@ -217,6 +217,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.applyFilter()
 		return m, nil
 
+	case editFinishedMsg:
+		if msg.err != nil {
+			m.status = msg.err.Error()
+			return m, nil
+		}
+		m.status = "note saved"
+		return m, m.reload()
+
 	case tea.KeyMsg:
 		return m.handleKey(msg)
 	}
@@ -297,6 +305,16 @@ func (m Model) handleListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.confirmPrompt = fmt.Sprintf("clear slot %d's name and note? [y/N]", sl.Number)
 		m.confirmCmd = cli.Command{Action: cli.ActionReset, Ref: strconv.Itoa(sl.Number)}
 		return m, nil
+
+	case "e":
+		sl := m.selected()
+		if sl == nil {
+			return m, nil
+		}
+		return m, tea.Exec(
+			&editCommand{session: m.session, ref: strconv.Itoa(sl.Number)},
+			func(err error) tea.Msg { return editFinishedMsg{err: err} },
+		)
 
 	case "n":
 		sl := m.selected()
