@@ -31,6 +31,7 @@ ACTIONS
   -m, --note   <ref> <text>   replace a slot's note inline
 
 OTHER
+      --move <ref> <to>   move a slot to another number
       --compact           renumber the slots to close the gaps
   doctor                  report slots whose path is gone
   init <shell>            print the shell integration (zsh, bash, fish)
@@ -154,6 +155,23 @@ EXAMPLES
 EXAMPLES
   dl -m 7 "waiting on the API fix"
   dl -m exam42 ""         clear the note
+`,
+
+	ActionMove: `dl --move <ref> <to> — move a slot to another number
+
+  If <to> is free, the slot simply takes it and nothing else changes.
+  If <to> is in use, the slot takes that position and the ones in
+  between shift by one to fill the hole it left. Either way the set of
+  numbers in use stays the same: a move rearranges, it does not close
+  gaps. Use --compact for that.
+
+  The browser does this with o (organize): space picks a slot up, you
+  move, space drops it.
+
+EXAMPLES
+  dl --move 7 2           put slot 7 second, shifting 2..6 down
+  dl --move 2 7           put it back
+  dl --move 9 5           if 5 is free, 9 simply becomes 5
 `,
 
 	ActionCompact: `dl --compact — renumber the slots to close the gaps

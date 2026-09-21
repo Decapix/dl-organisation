@@ -19,6 +19,7 @@ const (
 	ActionPath                  // dl -p <ref>
 	ActionRename                // dl -n <ref> <name>
 	ActionSetNote               // dl -m <ref> <text>
+	ActionMove                  // dl --move <ref> <to>
 	ActionCompact               // dl --compact
 	ActionDoctor                // dl doctor
 	ActionInit                  // dl init <shell>
@@ -49,6 +50,8 @@ func (a Action) String() string {
 		return "--name"
 	case ActionSetNote:
 		return "--note"
+	case ActionMove:
+		return "--move"
 	case ActionCompact:
 		return "--compact"
 	case ActionDoctor:
@@ -69,6 +72,7 @@ type Command struct {
 	Ref    string // slot reference, when the action takes one
 	Name   string // -n value
 	Note   string // -m value
+	To     string // --move target slot number
 	Edit   bool   // -e alongside -z
 	Reset  bool   // -r alongside -z
 	Long   bool   // -l on --see

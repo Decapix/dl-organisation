@@ -22,6 +22,8 @@ const helpOverlay = `  MOVE
     a              save the current directory to a free slot
                    (on an empty row, into that slot)
     c              renumber every slot to close the gaps
+    o              organize: space picks a slot up, move, space
+                   drops it there and the rest shift to suit
     ?              this page
     q / ctrl-c     quit without moving
 

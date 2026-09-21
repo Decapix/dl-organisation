@@ -36,6 +36,7 @@ const (
 	modeFilter
 	modeRename
 	modeConfirm
+	modeOrganize
 	modeHelp
 )
 
@@ -162,6 +163,12 @@ type Model struct {
 	// deserves a question; a typed command line does not.
 	confirmPrompt string
 	confirmCmd    cli.Command
+
+	// picked is the slot number being carried in organize mode, or 0 when
+	// nothing is held. Reordering is a two-step gesture — pick up, move,
+	// put down — because a one-shot "move slot 7 to 2" is hard to aim
+	// without seeing the list slide.
+	picked int
 
 	width, height int
 
@@ -361,47 +368,49 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleRenameKey(msg)
 	case modeConfirm:
 		return m.handleConfirmKey(msg)
+	case modeOrganize:
+		return m.handleOrganizeKey(msg)
 	}
 	return m.handleListKey(msg)
 }
 
-// handleListKey is the main keymap.
-func (m Model) handleListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "ctrl+c", "q":
-		return m, tea.Quit
-
+// moveCursor handles the navigation keys, shared by the list and organize
+// modes. It reports whether the key was one of them.
+func (m Model) moveCursor(key string) (Model, bool) {
+	switch key {
 	case "up", "k":
 		m.cursor--
-		m.clampCursor()
-		m.scrollToCursor()
-		m.syncNote()
-		return m, nil
 	case "down", "j":
 		if m.cursor < len(m.view)-1 {
 			m.cursor++
 		}
-		m.scrollToCursor()
-		m.syncNote()
-		return m, nil
 	case "g", "home":
 		m.cursor = 0
-		m.scrollToCursor()
-		m.syncNote()
-		return m, nil
 	case "G", "end":
 		m.cursor = len(m.view) - 1
-		m.clampCursor()
-		m.scrollToCursor()
-		m.syncNote()
-		return m, nil
-
 	case "ctrl+d", "pgdown":
 		m.note.HalfViewDown()
-		return m, nil
+		return m, true
 	case "ctrl+u", "pgup":
 		m.note.HalfViewUp()
-		return m, nil
+		return m, true
+	default:
+		return m, false
+	}
+	m.clampCursor()
+	m.scrollToCursor()
+	m.syncNote()
+	return m, true
+}
+
+// handleListKey is the main keymap.
+func (m Model) handleListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if moved, ok := m.moveCursor(msg.String()); ok {
+		return moved, nil
+	}
+	switch msg.String() {
+	case "ctrl+c", "q":
+		return m, tea.Quit
 
 	case "a":
 		// On a single empty row, save into that slot: showing a free number
@@ -456,6 +465,13 @@ func (m Model) handleListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.rename.CursorEnd()
 		m.rename.Focus()
 		return m, textinput.Blink
+
+	case "o":
+		// Organize mode exists so that space is unambiguous: in the main
+		// keymap it would be one stray thumb away from rearranging the list.
+		m.mode = modeOrganize
+		m.picked = 0
+		return m, nil
 
 	case "c":
 		// Compacting is about the whole store, so it works from any row,
@@ -561,6 +577,73 @@ func (m Model) handleFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	m.filter, cmd = m.filter.Update(msg)
 	m.applyFilter()
 	return m, cmd
+}
+
+// handleOrganizeKey is the pick-up / put-down loop.
+//
+// Space picks the slot under the cursor up and, on the second press, puts it
+// where the cursor is now. Everything in between is ordinary navigation, so
+// you watch the list while you aim.
+func (m Model) handleOrganizeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if moved, ok := m.moveCursor(msg.String()); ok {
+		return moved, nil
+	}
+	switch msg.String() {
+	case "ctrl+c":
+		return m, tea.Quit
+	case "esc", "q":
+		m.mode = modeList
+		m.picked = 0
+		return m, nil
+	case "o":
+		// A toggle while empty-handed; while carrying, o would be an odd way
+		// to abandon a move, so it cancels like escape.
+		m.mode = modeList
+		m.picked = 0
+		return m, nil
+	case " ", "space":
+		if m.picked == 0 {
+			return m.pickUp()
+		}
+		return m.putDown()
+	}
+	return m, nil
+}
+
+// pickUp takes the slot under the cursor into hand.
+func (m Model) pickUp() (tea.Model, tea.Cmd) {
+	sl := m.selected()
+	if sl == nil {
+		m.status = m.emptyRowMessage("pick up")
+		return m, nil
+	}
+	m.picked = sl.Number
+	return m, nil
+}
+
+// putDown moves the held slot to wherever the cursor is.
+func (m Model) putDown() (tea.Model, tea.Cmd) {
+	r := m.selectedRow()
+	// A collapsed run stands for a stretch of numbers, so there is no one
+	// place it means.
+	if r.collapsed() {
+		m.status = fmt.Sprintf("slots %d to %d are empty — pick a single row", r.from, r.to)
+		return m, nil
+	}
+	if r.from == 0 {
+		return m, nil
+	}
+	held := m.picked
+	m.mode = modeList
+	m.picked = 0
+	if r.from == held {
+		return m, nil // put back where it came from
+	}
+	return m.run(cli.Command{
+		Action: cli.ActionMove,
+		Ref:    strconv.Itoa(held),
+		To:     strconv.Itoa(r.from),
+	})
 }
 
 // emptyRowMessage explains why a slot key did nothing.

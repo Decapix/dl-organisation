@@ -130,6 +130,9 @@ func (m Model) renderRow(r row, numWidth, nameWidth int) string {
 	if sl.Note != "" {
 		mark = "*"
 	}
+	if m.picked == sl.Number {
+		mark = styleStatus.Render("↕") // the slot currently in hand
+	}
 	if !m.slotExists(sl) {
 		mark = styleDead.Render("x")
 	}
@@ -189,6 +192,13 @@ func (m Model) renderFooter() string {
 		prompt = m.rename.View()
 	case modeConfirm:
 		prompt = styleStatus.Render(m.confirmPrompt)
+	case modeOrganize:
+		if m.picked == 0 {
+			prompt = styleDim.Render("organize — space picks a slot up, esc leaves")
+		} else {
+			prompt = styleStatus.Render(fmt.Sprintf(
+				"moving slot %d — space drops it here, esc cancels", m.picked))
+		}
 	default:
 		prompt = styleDim.Render(keyHints)
 	}

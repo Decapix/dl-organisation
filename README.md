@@ -68,6 +68,7 @@ ACTIONS
   -m, --note   <ref> <text>   replace a slot's note inline
 
 OTHER
+      --move <ref> <to>   move a slot to another number
       --compact           renumber the slots to close the gaps
   doctor                  report slots whose path is gone
   init <shell>            print the shell integration (zsh, bash, fish)
@@ -114,6 +115,7 @@ slot.
 | `a` | save the current directory to the lowest free slot |
 | `d` `r` | delete / clear name and note — both ask first |
 | `c` | renumber every slot to close the gaps — asks first |
+| `o` | organize: space picks a slot up, move, space drops it there |
 | `ctrl-d` `ctrl-u` | scroll a long note |
 | `?` | every key |
 | `q` `ctrl-c` | quit without moving |
@@ -143,6 +145,34 @@ ones.
 Nothing is ever destroyed implicitly. Saving over an occupied slot replaces the
 path and **keeps** the name and the note — you have to type `-r` to clear them
 or `-d` to remove the slot.
+
+## Reordering
+
+Press `o` in the browser, then space to pick the slot under the cursor up. Move
+wherever you like — the held slot is marked `↕` and the footer says what you
+are carrying — and press space again to put it down there.
+
+```
+    1  coloriage   ~/work/coloriage-app/svg
+  * 2  cpp08       ~/42/code/cpp/cpp08
+    3  ir-landing  ~/style-site/new-landing-ir
+ ▸↕ 4  exam42      ~/42/exams/exam5/s4/level1
+
+ moving slot 4 — space drops it here, esc cancels
+```
+
+Dropping it on slot 2 makes it slot 2 and shifts 2 and 3 down by one. Dropping
+it on a free number just gives it that number. Either way the set of numbers in
+use is unchanged: a move rearranges, it never closes gaps behind your back.
+
+From the command line the same thing is `dl --move <ref> <to>`:
+
+```
+$ dl --move 4 2
+4 -> 2
+2 -> 3
+3 -> 4
+```
 
 ## Closing the gaps
 

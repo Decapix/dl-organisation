@@ -85,7 +85,7 @@ func (s *Session) HomeDir() string { return s.Home }
 func writesStore(a cli.Action) bool {
 	switch a {
 	case cli.ActionSet, cli.ActionEdit, cli.ActionReset, cli.ActionDelete,
-		cli.ActionRename, cli.ActionSetNote, cli.ActionCompact:
+		cli.ActionRename, cli.ActionSetNote, cli.ActionCompact, cli.ActionMove:
 		return true
 	}
 	return false
