@@ -51,6 +51,12 @@ func See(env *Env, cmd cli.Command) error {
 		// column: 2 (margin) + 1 (marker) + 1 (space) + numWidth + 2.
 		if sl.HasNote() {
 			for _, line := range strings.Split(sl.Note, "\n") {
+				// A blank line stays blank: indenting it would leave
+				// trailing whitespace in the output.
+				if strings.TrimSpace(line) == "" {
+					fmt.Fprintln(env.Out)
+					continue
+				}
 				fmt.Fprintf(env.Out, "%*s%s\n", numWidth+6, "", line)
 			}
 		}

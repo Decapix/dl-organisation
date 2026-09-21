@@ -107,6 +107,26 @@ func TestSeeLong(t *testing.T) {
 	}
 }
 
+// A blank line inside a note must not pick up the indent, or every paragraph
+// break would carry trailing whitespace.
+func TestSeeLongDoesNotIndentBlankNoteLines(t *testing.T) {
+	env, out, _ := testEnv(t)
+	allPathsExist(env)
+	env.Store.Put(slots.Slot{Number: 1, Name: "a", Path: "/home/u/a", Note: "one\n\ntwo"})
+
+	if err := Run(env, cli.Command{Action: cli.ActionSee, Long: true}); err != nil {
+		t.Fatal(err)
+	}
+	want := "1 slot\n\n" +
+		"  * 1  a  ~/a\n" +
+		"       one\n" +
+		"\n" +
+		"       two\n"
+	if out.String() != want {
+		t.Fatalf("output =\n%q\nwant\n%q", out.String(), want)
+	}
+}
+
 func TestSeeQuietPrintsFullPathsOnly(t *testing.T) {
 	env, out, _ := testEnv(t)
 	env.Store.Put(slots.Slot{Number: 3, Name: "c", Path: "/home/u/c", Note: "n"})
