@@ -17,6 +17,7 @@ const (
 	ActionReset                 // dl -r <ref>
 	ActionDelete                // dl -d <ref>
 	ActionPath                  // dl -p <ref>
+	ActionAbout                 // dl -a <ref>
 	ActionRename                // dl -n <ref> <name>
 	ActionSetNote               // dl -m <ref> <text>
 	ActionMove                  // dl --move <ref> <to>
@@ -46,6 +47,8 @@ func (a Action) String() string {
 		return "--delete"
 	case ActionPath:
 		return "--path"
+	case ActionAbout:
+		return "--about"
 	case ActionRename:
 		return "--name"
 	case ActionSetNote:

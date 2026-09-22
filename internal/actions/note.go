@@ -10,6 +10,11 @@ import (
 
 // Edit opens a slot's note in the user's editor. Only the note changes: the
 // path and the name are left exactly as they were.
+//
+// The editor runs before the write lock is taken, not under it: see update.
+// The slot is read once, without the lock, to seed the editor, and read again
+// under the lock to apply the result, because anything may have happened to
+// the store in between.
 func Edit(env *Env, cmd cli.Command) error {
 	sl, err := env.Store.Resolve(cmd.Ref)
 	if err != nil {
@@ -21,9 +26,25 @@ func Edit(env *Env, cmd cli.Command) error {
 		// failed editor is a failed command.
 		return fmt.Errorf("the note is unchanged: %w", err)
 	}
-	sl.Note = edited
-	env.Store.Put(sl)
-	if err := saveChanges(env); err != nil {
+
+	err = update(env, func(st *slots.Store) error {
+		cur, ok := st.Get(sl.Number)
+		if !ok {
+			// Saving would recreate a slot somebody just removed on purpose.
+			rescue(env, edited)
+			return fmt.Errorf("slot %d was deleted while the editor was open; the note was not saved",
+				sl.Number)
+		}
+		if cur.Note != sl.Note {
+			fmt.Fprintf(env.Err, "warning: slot %d's note was changed by another dl while the editor was open; this version replaces it\n",
+				sl.Number)
+		}
+		cur.Note = edited
+		st.Put(cur)
+		sl = cur
+		return nil
+	})
+	if err != nil {
 		return err
 	}
 	if sl.HasNote() {

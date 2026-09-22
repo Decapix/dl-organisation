@@ -10,7 +10,7 @@ import (
 func TestEveryActionHasHelp(t *testing.T) {
 	actions := []Action{
 		ActionTUI, ActionCD, ActionSet, ActionSee, ActionEdit, ActionReset,
-		ActionDelete, ActionPath, ActionRename, ActionSetNote, ActionMove,
+		ActionDelete, ActionPath, ActionAbout, ActionRename, ActionSetNote, ActionMove,
 		ActionCompact, ActionDoctor, ActionInit,
 	}
 	for _, a := range actions {

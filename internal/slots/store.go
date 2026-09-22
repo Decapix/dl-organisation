@@ -59,10 +59,17 @@ func Open(dir string) (*Store, error) {
 // The lock is held until Close, which makes the whole read-modify-write cycle
 // atomic against other dl processes. Callers must defer Close.
 func OpenForUpdate(dir string) (*Store, error) {
+	return OpenForUpdateNotify(dir, nil)
+}
+
+// OpenForUpdateNotify is OpenForUpdate with a hook: onWait is called once if
+// another process holds the lock, right before this one starts waiting for
+// it. It is how the command line gets to print "waiting" instead of nothing.
+func OpenForUpdateNotify(dir string, onWait func()) (*Store, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, fmt.Errorf("create %s: %w", dir, err)
 	}
-	lk, err := acquireLock(filepath.Join(dir, LockFileName))
+	lk, err := acquireLock(filepath.Join(dir, LockFileName), onWait)
 	if err != nil {
 		return nil, err
 	}
@@ -86,6 +93,10 @@ func (s *Store) Close() error {
 
 // Dir reports the directory the store lives in.
 func (s *Store) Dir() string { return s.dir }
+
+// Writable reports whether the store holds the write lock, i.e. it was opened
+// with OpenForUpdate and not yet closed.
+func (s *Store) Writable() bool { return s.lock != nil }
 
 // file is the full path of the store file.
 func (s *Store) file() string { return filepath.Join(s.dir, StoreFileName) }

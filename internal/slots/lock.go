@@ -15,13 +15,23 @@ type lockFile struct {
 }
 
 // acquireLock blocks until the lock is available. Commands are short, so a
-// blocking wait is friendlier than failing with "try again".
-func acquireLock(path string) (*lockFile, error) {
+// blocking wait is friendlier than failing with "try again". The lock is
+// tried without waiting first; when that fails, onWait (if any) is called
+// once before the blocking attempt, so the caller can say that it is
+// waiting rather than sit on a frozen prompt.
+func acquireLock(path string, onWait func()) (*lockFile, error) {
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o644)
 	if err != nil {
 		return nil, fmt.Errorf("open lock %s: %w", path, err)
 	}
-	if err := unix.Flock(int(f.Fd()), unix.LOCK_EX); err != nil {
+	err = unix.Flock(int(f.Fd()), unix.LOCK_EX|unix.LOCK_NB)
+	if err == unix.EWOULDBLOCK {
+		if onWait != nil {
+			onWait()
+		}
+		err = unix.Flock(int(f.Fd()), unix.LOCK_EX)
+	}
+	if err != nil {
 		f.Close()
 		return nil, fmt.Errorf("lock %s: %w", path, err)
 	}

@@ -44,15 +44,17 @@ func (s *Session) Slots() ([]slots.Slot, error) {
 
 // Run executes one command, writing the action's output to out.
 //
-// The store is opened for update only when the action writes, so listing and
-// jumping never wait behind an edit in progress elsewhere.
+// The store is opened for update only when the action writes without first
+// running the editor, so listing and jumping never wait behind a write in
+// progress elsewhere. The two editor actions open it read-only and take the
+// lock themselves, for the write alone: see update.
 func (s *Session) Run(cmd cli.Command, out io.Writer) error {
 	var (
 		store *slots.Store
 		err   error
 	)
-	if writesStore(cmd.Action) {
-		store, err = slots.OpenForUpdate(s.Dir)
+	if writesStore(cmd) {
+		store, err = openForUpdate(s.Dir, s.Err)
 	} else {
 		store, err = slots.Open(s.Dir)
 	}
@@ -81,11 +83,15 @@ func (s *Session) CurrentDir() string { return s.Cwd }
 // HomeDir reports the home directory, used to shorten paths for display.
 func (s *Session) HomeDir() string { return s.Home }
 
-// writesStore reports whether an action needs the write lock.
-func writesStore(a cli.Action) bool {
-	switch a {
-	case cli.ActionSet, cli.ActionEdit, cli.ActionReset, cli.ActionDelete,
-		cli.ActionRename, cli.ActionSetNote, cli.ActionCompact, cli.ActionMove:
+// writesStore reports whether a command needs the write lock for its whole
+// run. Commands that open the editor do not: they would hold it across an
+// interactive session of any length, and take it themselves afterwards.
+func writesStore(cmd cli.Command) bool {
+	switch cmd.Action {
+	case cli.ActionSet:
+		return !cmd.Edit
+	case cli.ActionReset, cli.ActionDelete, cli.ActionRename,
+		cli.ActionSetNote, cli.ActionCompact, cli.ActionMove:
 		return true
 	}
 	return false

@@ -44,8 +44,8 @@ func Parse(argv []string) (Command, error) {
 		positionals []string
 		help        bool
 		// which flags were seen
-		cd, set, see, edit, reset, del, path, rename, note bool
-		compact, move, long, quiet, version                bool
+		cd, set, see, edit, reset, del, path, about, rename, note bool
+		compact, move, long, quiet, version                       bool
 	)
 
 	// An explicit index rather than a range loop: value-taking flags advance
@@ -100,6 +100,8 @@ func Parse(argv []string) (Command, error) {
 			del = true
 		case "-p", "--path":
 			path = true
+		case "-a", "--about":
+			about = true
 		case "-l", "--long":
 			long = true
 		case "-q", "--quiet":
@@ -160,6 +162,7 @@ func Parse(argv []string) (Command, error) {
 	countIf(see, ActionSee)
 	countIf(del, ActionDelete)
 	countIf(path, ActionPath)
+	countIf(about, ActionAbout)
 	countIf(compact, ActionCompact)
 	countIf(move, ActionMove)
 	if !set {
@@ -220,7 +223,7 @@ func validate(cmd *Command, pos []string, long, quiet bool) error {
 	}
 
 	switch cmd.Action {
-	case ActionCD, ActionEdit, ActionReset, ActionDelete, ActionPath:
+	case ActionCD, ActionAbout, ActionEdit, ActionReset, ActionDelete, ActionPath:
 		if err := want(1, "exactly one slot reference"); err != nil {
 			return err
 		}

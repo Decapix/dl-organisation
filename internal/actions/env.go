@@ -74,6 +74,8 @@ func Run(env *Env, cmd cli.Command) error {
 		return Delete(env, cmd)
 	case cli.ActionPath:
 		return Path(env, cmd)
+	case cli.ActionAbout:
+		return About(env, cmd)
 	case cli.ActionRename:
 		return Rename(env, cmd)
 	case cli.ActionSetNote:
@@ -91,4 +93,58 @@ func Run(env *Env, cmd cli.Command) error {
 // saveChanges persists the store. Actions call it once, at the end.
 func saveChanges(env *Env) error {
 	return env.Store.Save()
+}
+
+// update runs fn against a store that holds the write lock, then saves.
+//
+// It exists for the two actions that run the editor. The editor is
+// interactive and may stay open for an hour, and the exclusive lock waits
+// silently, so holding it across the editor froze every other dl in every
+// other shell. Those actions therefore run against a read-only store, do
+// the editor round trip, and call update for just the write. fn is handed a
+// freshly loaded store rather than env.Store, whose contents are as old as
+// the editor session.
+//
+// When env.Store already holds the lock — the one-shot tests build their Env
+// that way — fn runs against it directly; opening a second locked store on
+// the same directory from the same process would wait on itself forever.
+func update(env *Env, fn func(st *slots.Store) error) error {
+	if env.Store.Writable() {
+		if err := fn(env.Store); err != nil {
+			return err
+		}
+		return env.Store.Save()
+	}
+	st, err := openForUpdate(env.Store.Dir(), env.Err)
+	if err != nil {
+		return err
+	}
+	defer st.Close()
+	if err := fn(st); err != nil {
+		return err
+	}
+	return st.Save()
+}
+
+// openForUpdate takes the write lock, telling the user on errw when it has
+// to wait for it. The wait is otherwise silent and, behind an editor left
+// open in another shell, can last a long time; a frozen prompt with nothing
+// on it reads as a hang.
+func openForUpdate(dir string, errw io.Writer) (*slots.Store, error) {
+	return slots.OpenForUpdateNotify(dir, func() {
+		if errw == nil {
+			return
+		}
+		fmt.Fprintln(errw, "waiting for another dl to release the store...")
+		fmt.Fprintln(errw, "  (if this never returns, another dl is still busy — pgrep -a dl finds it)")
+	})
+}
+
+// rescue prints text that could not be saved, so that a note typed into the
+// editor is never simply gone.
+func rescue(env *Env, text string) {
+	if text == "" {
+		return
+	}
+	fmt.Fprintf(env.Err, "the text you typed was:\n%s\n", text)
 }

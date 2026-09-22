@@ -3,6 +3,7 @@ package slots
 import (
 	"sync"
 	"testing"
+	"time"
 )
 
 // TestConcurrentUpdatesDoNotLoseWrites is the regression test for the bug in
@@ -56,5 +57,45 @@ func TestReleaseIsIdempotent(t *testing.T) {
 	}
 	if err := st.Close(); err != nil {
 		t.Fatalf("second Close: %v", err)
+	}
+}
+
+// A wait on the lock must not be silent: the caller is told, once, that it
+// is waiting, so a shell blocked behind an editor left open elsewhere shows
+// a line instead of nothing.
+func TestOpenForUpdateNotifyCallsOnWaitWhileTheLockIsHeld(t *testing.T) {
+	dir := t.TempDir()
+	holder, err := OpenForUpdate(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	released := make(chan struct{})
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		holder.Close()
+		close(released)
+	}()
+
+	waited := 0
+	st, err := OpenForUpdateNotify(dir, func() { waited++ })
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	<-released
+	if waited != 1 {
+		t.Fatalf("onWait called %d times, want exactly once", waited)
+	}
+}
+
+func TestOpenForUpdateNotifyIsSilentWhenTheLockIsFree(t *testing.T) {
+	waited := false
+	st, err := OpenForUpdateNotify(t.TempDir(), func() { waited = true })
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	if waited {
+		t.Fatal("onWait was called although nobody held the lock")
 	}
 }

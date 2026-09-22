@@ -58,6 +58,7 @@ USAGE
 
 ACTIONS
   -c, --cd     <ref>      cd into a slot
+  -a, --about  <ref>      cd into a slot and show its name, path and note
   -z, --set    [ref]      save $PWD into a slot (default: lowest free slot)
   -s, --see               list every slot
   -e, --edit   <ref>      edit a slot's note in $EDITOR
@@ -122,8 +123,9 @@ slot.
 
 Paths are elided in the middle, keeping the end, because the end is what tells
 you which project a row is. Below 80 columns the note moves under the list;
-below 60 it is dropped. A browser left open holds no lock, so `dl -z` in
-another shell never waits on it.
+below 60 it is dropped. A browser left open holds no lock, and neither does an
+editor opened with `e` or `dl -e`, so `dl -z` in another shell never waits on
+either.
 
 ## Slots, names and notes
 

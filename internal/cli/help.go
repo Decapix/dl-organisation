@@ -21,6 +21,7 @@ USAGE
 
 ACTIONS
   -c, --cd     <ref>      cd into a slot
+  -a, --about  <ref>      cd into a slot and show its name, path and note
   -z, --set    [ref]      save $PWD into a slot (default: lowest free slot)
   -s, --see               list every slot
   -e, --edit   <ref>      edit a slot's note in $EDITOR
@@ -55,6 +56,21 @@ EXAMPLES
   dl exam42               by name
   dl ex                   by unique prefix
   dl -c 7                 explicit, for scripts
+`,
+
+	ActionAbout: `dl -a, --about <ref> — cd into a slot and show what it is
+
+  Like "dl <ref>", but before the note it prints one line with the slot's
+  number, name and path. Plain "dl <ref>" prints only the note, which is
+  right when you know where you are going; -a is for when you do not, or
+  when you want to read the whole note again without leaving.
+
+  A slot with no note says so and points at dl -e to write one.
+
+EXAMPLES
+  dl -a 7
+  dl 7 -a                 same thing
+  dl -a scraping          by name
 `,
 
 	ActionSet: `dl -z, --set [ref] — save the current directory into a slot
