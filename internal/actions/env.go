@@ -12,6 +12,8 @@ import (
 	"io"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
+
 	"github.com/Decapix/dl-organisation/internal/cli"
 	"github.com/Decapix/dl-organisation/internal/editor"
 	"github.com/Decapix/dl-organisation/internal/slots"
@@ -32,6 +34,11 @@ type Env struct {
 
 	Editor editor.Editor
 	Now    func() time.Time // injected so tests get stable timestamps
+
+	// Renderer colours the output. Nil means plain text. main hands in one
+	// built on stdout; lipgloss itself drops the colour when stdout is not a
+	// terminal or NO_COLOR is set, so pipes always see plain text.
+	Renderer *lipgloss.Renderer
 
 	// Exists reports whether a slot's directory is still there. It is a seam
 	// so that rendering tests can pin the marker column without creating real

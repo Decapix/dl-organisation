@@ -38,12 +38,15 @@ func See(env *Env, cmd cli.Command) error {
 
 	numWidth, nameWidth := columnWidths(all)
 	for i, sl := range all {
-		fmt.Fprintf(env.Out, "  %s %*d  %-*s  %s\n",
+		// Rows alternate between two colours; in long form the note lines
+		// under a row take its colour, so a row and its note read as one
+		// block.
+		fmt.Fprintln(env.Out, env.stripe(i, fmt.Sprintf("  %s %*d  %-*s  %s",
 			marker(sl, env.exists(sl)),
 			numWidth, sl.Number,
 			nameWidth, sl.DisplayName(),
 			slots.ShortPath(sl.Path, env.Home),
-		)
+		)))
 		if !cmd.Long {
 			continue
 		}
@@ -57,7 +60,7 @@ func See(env *Env, cmd cli.Command) error {
 					fmt.Fprintln(env.Out)
 					continue
 				}
-				fmt.Fprintf(env.Out, "%*s%s\n", numWidth+6, "", line)
+				fmt.Fprintln(env.Out, env.stripe(i, fmt.Sprintf("%*s%s", numWidth+6, "", line)))
 			}
 		}
 		if i < len(all)-1 {

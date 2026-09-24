@@ -1,7 +1,12 @@
 package actions
 
 import (
+	"bytes"
+	"strings"
 	"testing"
+
+	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
 
 	"github.com/Decapix/dl-organisation/internal/cli"
 	"github.com/Decapix/dl-organisation/internal/slots"
@@ -163,4 +168,98 @@ func splitLines(s string) []string {
 		}
 	}
 	return lines
+}
+
+// colourEnv gives the env a renderer that always emits colour, so a test can
+// see the escape sequences a real terminal would get.
+func colourEnv(t *testing.T) (*Env, *bytes.Buffer) {
+	t.Helper()
+	env, out, _ := testEnv(t)
+	allPathsExist(env)
+	r := lipgloss.NewRenderer(out)
+	r.SetColorProfile(termenv.TrueColor)
+	env.Renderer = r
+	return env, out
+}
+
+// The rows of a listing alternate between two colours, so the eye can follow
+// a row across the columns. The colour covers the whole line.
+func TestSeeStripesRowsWithTwoColours(t *testing.T) {
+	env, out := colourEnv(t)
+	for _, n := range []int{1, 2, 3} {
+		env.Store.Put(slots.Slot{Number: n, Name: "s", Path: "/home/u"})
+	}
+	if err := Run(env, cli.Command{Action: cli.ActionSee}); err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimRight(out.String(), "\n"), "\n")
+	rows := lines[2:] // after "3 slots" and the blank line
+	if len(rows) != 3 {
+		t.Fatalf("got %d rows: %q", len(rows), rows)
+	}
+	first, second, third := colourOf(t, rows[0]), colourOf(t, rows[1]), colourOf(t, rows[2])
+	if first == second {
+		t.Fatalf("rows 1 and 2 share a colour %q; want them to differ", first)
+	}
+	if first != third {
+		t.Fatalf("row 3 = %q, want it back to row 1's colour %q", third, first)
+	}
+	for _, row := range rows {
+		if !strings.HasPrefix(row, "\x1b[") {
+			t.Fatalf("row %q does not start with the colour; want the whole line coloured", row)
+		}
+	}
+}
+
+// In long form the note lines belong to their row and take its colour, so a
+// row and its note read as one block.
+func TestSeeLongStripesRowAndNoteTogether(t *testing.T) {
+	env, out := colourEnv(t)
+	env.Store.Put(slots.Slot{Number: 1, Name: "a", Path: "/home/u", Note: "line one\nline two"})
+	env.Store.Put(slots.Slot{Number: 2, Name: "b", Path: "/home/u", Note: "other"})
+	if err := Run(env, cli.Command{Action: cli.ActionSee, Long: true}); err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimRight(out.String(), "\n"), "\n")[2:]
+	// row 1, note, note, blank, row 2, note
+	if len(lines) != 6 {
+		t.Fatalf("got %d lines: %q", len(lines), lines)
+	}
+	rowA := colourOf(t, lines[0])
+	if colourOf(t, lines[1]) != rowA || colourOf(t, lines[2]) != rowA {
+		t.Fatalf("note lines %q %q do not share their row's colour %q", lines[1], lines[2], rowA)
+	}
+	if lines[3] != "" {
+		t.Fatalf("separator = %q, want a bare blank line", lines[3])
+	}
+	if colourOf(t, lines[4]) == rowA || colourOf(t, lines[5]) != colourOf(t, lines[4]) {
+		t.Fatalf("second block %q %q should share a colour distinct from %q", lines[4], lines[5], rowA)
+	}
+}
+
+// Without a renderer the output is plain text; every other see test relies
+// on that, this one just says so out loud.
+func TestSeeIsPlainWithoutARenderer(t *testing.T) {
+	env, out, _ := testEnv(t)
+	allPathsExist(env)
+	env.Store.Put(slots.Slot{Number: 1, Name: "a", Path: "/home/u"})
+	if err := Run(env, cli.Command{Action: cli.ActionSee}); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out.String(), "\x1b[") {
+		t.Fatalf("output %q carries escape sequences without a renderer", out.String())
+	}
+}
+
+// colourOf is the leading SGR sequence of a line.
+func colourOf(t *testing.T, line string) string {
+	t.Helper()
+	if !strings.HasPrefix(line, "\x1b[") {
+		t.Fatalf("line %q has no leading colour", line)
+	}
+	end := strings.IndexByte(line, 'm')
+	if end < 0 {
+		t.Fatalf("line %q: unterminated escape", line)
+	}
+	return line[:end+1]
 }

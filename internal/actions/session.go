@@ -4,6 +4,8 @@ import (
 	"io"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
+
 	"github.com/Decapix/dl-organisation/internal/cli"
 	"github.com/Decapix/dl-organisation/internal/editor"
 	"github.com/Decapix/dl-organisation/internal/slots"
@@ -25,9 +27,10 @@ type Session struct {
 	// cd. Empty means the integration is not installed.
 	CDFile string
 
-	Editor editor.Editor
-	Now    func() time.Time
-	Err    io.Writer // warnings and hints
+	Editor   editor.Editor
+	Now      func() time.Time
+	Err      io.Writer          // warnings and hints
+	Renderer *lipgloss.Renderer // colours the output; nil means plain
 }
 
 // Slots reads the store without taking the write lock and returns every slot
@@ -64,14 +67,15 @@ func (s *Session) Run(cmd cli.Command, out io.Writer) error {
 	defer store.Close()
 
 	return Run(&Env{
-		Store:  store,
-		Out:    out,
-		Err:    s.Err,
-		Cwd:    s.Cwd,
-		Home:   s.Home,
-		CDFile: s.CDFile,
-		Editor: s.Editor,
-		Now:    s.Now,
+		Store:    store,
+		Out:      out,
+		Err:      s.Err,
+		Cwd:      s.Cwd,
+		Home:     s.Home,
+		CDFile:   s.CDFile,
+		Editor:   s.Editor,
+		Now:      s.Now,
+		Renderer: s.Renderer,
 	}, cmd)
 }
 

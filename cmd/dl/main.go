@@ -12,6 +12,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
+
 	"github.com/Decapix/dl-organisation/internal/actions"
 	"github.com/Decapix/dl-organisation/internal/cli"
 	"github.com/Decapix/dl-organisation/internal/editor"
@@ -108,6 +110,9 @@ func runStoreCommand(cmd cli.Command) error {
 		Editor: editor.OS{},
 		Now:    time.Now,
 		Err:    os.Stderr,
+		// Built on stdout so that lipgloss decides about colour from the
+		// real terminal: a pipe or NO_COLOR gets plain text.
+		Renderer: lipgloss.NewRenderer(os.Stdout),
 	}
 
 	// A bare `dl` opens the browser. It is not a store command, so it does
