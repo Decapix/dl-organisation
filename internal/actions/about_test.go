@@ -10,23 +10,17 @@ import (
 	"github.com/Decapix/dl-organisation/internal/slots"
 )
 
-// --about is a cd that also shows the slot itself: its number, name and path
-// on one line, then the whole note. Plain `dl 7` prints only the note, which
-// is right when you know where you are going; -a is for when you do not.
-func TestAboutJumpsAndPrintsNamePathAndNote(t *testing.T) {
+// --about shows a slot in full without moving the shell: number, name and
+// path on one line, then the whole note. Plain `dl 7` prints the note only
+// once you have arrived; -a is for reading it from wherever you are.
+func TestAboutPrintsNamePathAndNote(t *testing.T) {
 	env, out, _ := testEnv(t)
 	dir := filepath.Join(env.Home, "work", "scraper")
-	env.Exists = func(string) bool { return true }
-	env.CDFile = filepath.Join(t.TempDir(), "cdfile")
 	env.Store.Put(slots.Slot{Number: 7, Name: "scraping", Path: dir,
 		Note: "pagination stops at p.4\nfix the retry loop"})
 
 	if err := Run(env, cli.Command{Action: cli.ActionAbout, Ref: "7"}); err != nil {
 		t.Fatalf("about: %v", err)
-	}
-	raw, err := os.ReadFile(env.CDFile)
-	if err != nil || string(raw) != dir {
-		t.Fatalf("cd file = %q, %v; want %q", raw, err, dir)
 	}
 	want := "slot 7  scraping  ~/work/scraper\n\npagination stops at p.4\nfix the retry loop\n"
 	if out.String() != want {
@@ -34,12 +28,27 @@ func TestAboutJumpsAndPrintsNamePathAndNote(t *testing.T) {
 	}
 }
 
+// It must not cd: the cd file stays unwritten even with the integration on.
+func TestAboutDoesNotMoveTheShell(t *testing.T) {
+	env, _, errb := testEnv(t)
+	env.CDFile = filepath.Join(t.TempDir(), "cdfile")
+	env.Store.Put(slots.Slot{Number: 7, Name: "n", Path: "/tmp/x", Note: "note"})
+
+	if err := Run(env, cli.Command{Action: cli.ActionAbout, Ref: "7"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(env.CDFile); err == nil {
+		t.Fatal("the cd file was written; --about must not move the shell")
+	}
+	if errb.Len() != 0 {
+		t.Fatalf("stderr = %q, want nothing (no cd, so no integration hint)", errb.String())
+	}
+}
+
 // An unnamed slot shows its display name, like every listing does, so the
 // header never has a hole in it.
 func TestAboutUsesTheDisplayNameOfAnUnnamedSlot(t *testing.T) {
 	env, out, _ := testEnv(t)
-	env.Exists = func(string) bool { return true }
-	env.CDFile = filepath.Join(t.TempDir(), "cdfile")
 	env.Store.Put(slots.Slot{Number: 7, Path: "/srv/coloriage", Note: "x"})
 
 	if err := Run(env, cli.Command{Action: cli.ActionAbout, Ref: "7"}); err != nil {
@@ -52,8 +61,6 @@ func TestAboutUsesTheDisplayNameOfAnUnnamedSlot(t *testing.T) {
 
 func TestAboutOnASlotWithoutANoteSaysSo(t *testing.T) {
 	env, out, _ := testEnv(t)
-	env.Exists = func(string) bool { return true }
-	env.CDFile = filepath.Join(t.TempDir(), "cdfile")
 	env.Store.Put(slots.Slot{Number: 7, Name: "bare", Path: "/tmp/x"})
 
 	if err := Run(env, cli.Command{Action: cli.ActionAbout, Ref: "7"}); err != nil {
@@ -64,34 +71,16 @@ func TestAboutOnASlotWithoutANoteSaysSo(t *testing.T) {
 	}
 }
 
-// It is a cd, so it fails the same way a cd does when the directory is gone.
-func TestAboutFailsOnADeadPath(t *testing.T) {
-	env, _, _ := testEnv(t)
-	env.CDFile = filepath.Join(t.TempDir(), "cdfile")
-	env.Store.Put(slots.Slot{Number: 7, Path: "/definitely/gone"})
-
-	if err := Run(env, cli.Command{Action: cli.ActionAbout, Ref: "7"}); err == nil {
-		t.Fatal("about on a dead path = nil error, want an error")
-	}
-	if _, err := os.Stat(env.CDFile); err == nil {
-		t.Fatal("the cd file was written despite the failure")
-	}
-}
-
-// Without the shell integration the header still carries the path, so the
-// user can cd by hand; the hint about installing it goes to stderr as for cd.
-func TestAboutWithoutIntegrationPrintsTheHint(t *testing.T) {
-	env, out, errb := testEnv(t)
-	env.Exists = func(string) bool { return true }
-	env.Store.Put(slots.Slot{Number: 7, Name: "n", Path: "/tmp/x", Note: "note"})
+// Looking at a slot whose directory is gone still works, as --path does; the
+// note may be the only record of what was there.
+func TestAboutWorksOnADeadPath(t *testing.T) {
+	env, out, _ := testEnv(t)
+	env.Store.Put(slots.Slot{Number: 7, Path: "/definitely/gone", Note: "was the old scraper"})
 
 	if err := Run(env, cli.Command{Action: cli.ActionAbout, Ref: "7"}); err != nil {
-		t.Fatal(err)
+		t.Fatalf("about on a dead path: %v", err)
 	}
-	if !strings.Contains(out.String(), "/tmp/x") || !strings.Contains(out.String(), "note") {
-		t.Fatalf("output = %q, want the path and the note", out.String())
-	}
-	if !strings.Contains(errb.String(), "dl init") {
-		t.Fatalf("stderr = %q, want the integration hint", errb.String())
+	if !strings.Contains(out.String(), "was the old scraper") {
+		t.Fatalf("output = %q, want the note", out.String())
 	}
 }

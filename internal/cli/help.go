@@ -21,7 +21,7 @@ USAGE
 
 ACTIONS
   -c, --cd     <ref>      cd into a slot
-  -a, --about  <ref>      cd into a slot and show its name, path and note
+  -a, --about  <ref>      show a slot's name, path and note, without moving
   -z, --set    [ref]      save $PWD into a slot (default: lowest free slot)
   -s, --see               list every slot
   -e, --edit   <ref>      edit a slot's note in $EDITOR
@@ -58,14 +58,15 @@ EXAMPLES
   dl -c 7                 explicit, for scripts
 `,
 
-	ActionAbout: `dl -a, --about <ref> — cd into a slot and show what it is
+	ActionAbout: `dl -a, --about <ref> — show a slot without going there
 
-  Like "dl <ref>", but before the note it prints one line with the slot's
-  number, name and path. Plain "dl <ref>" prints only the note, which is
-  right when you know where you are going; -a is for when you do not, or
-  when you want to read the whole note again without leaving.
+  Prints one line with the slot's number, name and path, then the whole
+  note. Nothing else happens: your shell stays where it is. "dl <ref>"
+  prints the note only once you have arrived; -a is for reading it from
+  wherever you are, or for checking what a slot is before you jump.
 
-  A slot with no note says so and points at dl -e to write one.
+  A slot with no note says so and points at dl -e to write one. It works
+  on a directory that no longer exists, as --path does.
 
 EXAMPLES
   dl -a 7

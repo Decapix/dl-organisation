@@ -58,7 +58,7 @@ USAGE
 
 ACTIONS
   -c, --cd     <ref>      cd into a slot
-  -a, --about  <ref>      cd into a slot and show its name, path and note
+  -a, --about  <ref>      show a slot's name, path and note, without moving
   -z, --set    [ref]      save $PWD into a slot (default: lowest free slot)
   -s, --see               list every slot
   -e, --edit   <ref>      edit a slot's note in $EDITOR
